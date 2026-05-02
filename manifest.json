@@ -124,7 +124,7 @@
       "required": false,
       "description": "Refresh interval in seconds (minimum 300)",
       "default": "1800"
-    },
+    }
   ],
   "variables": {
     "groups": {
@@ -170,7 +170,7 @@
         "max_length": 20,
         "group": "meta",
         "example": "2026-05-02T14:30:00"
-      },
+      }
     }
   },
   "fiestaboard_version": ">=2.10.0",
