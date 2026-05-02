@@ -249,16 +249,6 @@ class TestPluginValidateConfig:
         errors = self._plugin().validate_config(base_config)
         assert errors == []
 
-    def test_history_size_too_large(self, base_config):
-        base_config["history_size"] = 9999
-        errors = self._plugin().validate_config(base_config)
-        assert any("history_size" in e for e in errors)
-
-    def test_history_size_zero(self, base_config):
-        base_config["history_size"] = 0
-        errors = self._plugin().validate_config(base_config)
-        assert any("history_size" in e for e in errors)
-
     def test_temperature_out_of_range(self, base_config):
         base_config["temperature"] = 3.5
         errors = self._plugin().validate_config(base_config)
@@ -325,17 +315,6 @@ class TestPluginFetchData:
         assert "{blue}" in result.data["art"] or "{red}" in result.data["art"]
 
     @patch("plugins.generative_ai_art.source.requests.post")
-    def test_history_grows(self, mock_post, base_config, sample_manifest):
-        mock_post.return_value = self._mock_response()
-        plugin = self._make_plugin(base_config, sample_manifest)
-
-        plugin.fetch_data()
-        plugin.fetch_data()
-        plugin.fetch_data()
-
-        assert len(plugin._history) == 3
-
-    @patch("plugins.generative_ai_art.source.requests.post")
     def test_fallback_on_api_error(self, mock_post, base_config, sample_manifest):
         """After a successful fetch, an API error should return the last good piece."""
         import requests as req_module
@@ -386,86 +365,6 @@ class TestPluginFetchData:
 
 
 # ---------------------------------------------------------------------------
-# Plugin: history persistence (mocked filesystem)
-# ---------------------------------------------------------------------------
-
-class TestPluginHistoryPersistence:
-    """Tests for history save/load behaviour."""
-
-    @patch("plugins.generative_ai_art.source.requests.post")
-    def test_history_not_saved_when_persist_false(self, mock_post, base_config, sample_manifest, tmp_path):
-        mock_post.return_value = MagicMock(
-            raise_for_status=MagicMock(),
-            json=MagicMock(return_value={
-                "choices": [{"message": {"content": _valid_response()}}]
-            }),
-        )
-        base_config["persist_history"] = False
-        plugin = GenerativeAiArtPlugin(sample_manifest)
-        plugin.config = base_config
-        plugin.fetch_data()
-
-        # Nothing should be written
-        import plugins.generative_ai_art as plugin_mod
-        history_file = plugin_mod._HISTORY_FILE
-        assert not history_file.exists()
-
-    @patch("plugins.generative_ai_art.source.requests.post")
-    def test_history_loaded_on_init(self, mock_post, tmp_path, sample_manifest):
-        """Pre-seeded history on disk should be loaded when the generator is first built."""
-        import plugins.generative_ai_art as plugin_mod
-
-        pre_records = [
-            {
-                "theme": "old theme",
-                "description": "old desc",
-                "art": "{blue}",
-                "model": "gpt-4o-mini",
-                "generated_at": "2026-01-01T00:00:00",
-            }
-        ]
-
-        history_dir = tmp_path / "data" / "plugins" / "generative_ai_art"
-        history_dir.mkdir(parents=True)
-        history_file = history_dir / "history.json"
-        history_file.write_text(json.dumps(pre_records))
-
-        mock_post.return_value = MagicMock(
-            raise_for_status=MagicMock(),
-            json=MagicMock(return_value={
-                "choices": [{"message": {"content": _valid_response()}}]
-            }),
-        )
-
-        original_file = plugin_mod._HISTORY_FILE
-        original_dir = plugin_mod._HISTORY_DIR
-        try:
-            plugin_mod._HISTORY_FILE = history_file
-            plugin_mod._HISTORY_DIR = history_dir
-
-            plugin = GenerativeAiArtPlugin(sample_manifest)
-            plugin.config = {
-                "api_key": "sk-test",
-                "api_base_url": "https://api.openai.com/v1",
-                "model": "gpt-4o-mini",
-                "device_type": "flagship",
-                "temperature": 1.2,
-                "refresh_seconds": 1800,
-                "history_size": 100,
-                "persist_history": True,
-            }
-
-            # Trigger generator build (which loads history)
-            plugin._get_generator()
-
-            assert len(plugin._history) == 1
-            assert plugin._history[0]["theme"] == "old theme"
-        finally:
-            plugin_mod._HISTORY_FILE = original_file
-            plugin_mod._HISTORY_DIR = original_dir
-
-
-# ---------------------------------------------------------------------------
 # Theme pool
 # ---------------------------------------------------------------------------
 
@@ -477,103 +376,3 @@ class TestBuiltinThemes:
         for theme in BUILTIN_THEMES:
             assert isinstance(theme, str) and theme.strip()
 
-
-# ---------------------------------------------------------------------------
-# Plugin: paused and pin_offset behaviour
-# ---------------------------------------------------------------------------
-
-class TestPausedAndPin:
-    """Tests for paused flag and pin_offset field in fetch_data."""
-
-    def _make_plugin(self, base_config, manifest):
-        plugin = GenerativeAiArtPlugin(manifest)
-        plugin.config = base_config
-        return plugin
-
-    def _mock_response(self, theme: str = "ocean waves") -> MagicMock:
-        mock_resp = MagicMock()
-        mock_resp.raise_for_status = MagicMock()
-        mock_resp.json.return_value = {
-            "choices": [{"message": {"content": _valid_response(theme=theme)}}]
-        }
-        return mock_resp
-
-    @patch("plugins.generative_ai_art.source.requests.post")
-    def test_paused_returns_latest_history_piece(self, mock_post, base_config, sample_manifest):
-        """When paused=True and history has entries, the latest piece is returned."""
-        mock_post.return_value = self._mock_response(theme="first")
-        plugin = self._make_plugin(base_config, sample_manifest)
-
-        # Generate one piece to populate history
-        first = plugin.fetch_data()
-        assert first.available is True
-
-        # Pause — no new HTTP call should happen
-        plugin.config = {**base_config, "paused": True}
-        result = plugin.fetch_data()
-
-        assert result.available is True
-        assert result.data["theme"] == "first"
-        # Only 1 HTTP call total (the initial generation)
-        assert mock_post.call_count == 1
-
-    @patch("plugins.generative_ai_art.source.requests.post")
-    def test_paused_with_empty_history_falls_through_to_generate(
-        self, mock_post, base_config, sample_manifest
-    ):
-        """When paused=True but history is empty, generation runs once."""
-        mock_post.return_value = self._mock_response(theme="bootstrap")
-        base_config_paused = {**base_config, "paused": True}
-        plugin = self._make_plugin(base_config_paused, sample_manifest)
-
-        result = plugin.fetch_data()
-
-        assert result.available is True
-        assert mock_post.call_count == 1
-
-    @patch("plugins.generative_ai_art.source.requests.post")
-    def test_pin_offset_zero_returns_latest(self, mock_post, base_config, sample_manifest):
-        """pin_offset=0 (with paused=False) falls through to generation normally."""
-        mock_post.return_value = self._mock_response(theme="latest")
-        plugin = self._make_plugin({**base_config, "pin_offset": 0}, sample_manifest)
-
-        result = plugin.fetch_data()
-        assert result.available is True
-        assert mock_post.call_count == 1
-
-    @patch("plugins.generative_ai_art.source.requests.post")
-    def test_pin_offset_returns_older_piece(self, mock_post, base_config, sample_manifest):
-        """pin_offset=1 returns the second-to-last history entry."""
-        mock_post.side_effect = [
-            self._mock_response(theme="first piece"),
-            self._mock_response(theme="second piece"),
-        ]
-        plugin = self._make_plugin(base_config, sample_manifest)
-
-        plugin.fetch_data()  # first piece
-        plugin.fetch_data()  # second piece
-        assert len(plugin._history) == 2
-
-        # Now pin to offset 1 (one piece back = "first piece")
-        plugin.config = {**base_config, "pin_offset": 1}
-        result = plugin.fetch_data()
-
-        assert result.available is True
-        assert result.data["theme"] == "first piece"
-        # No additional HTTP call
-        assert mock_post.call_count == 2
-
-    @patch("plugins.generative_ai_art.source.requests.post")
-    def test_pin_offset_clamped_to_oldest(self, mock_post, base_config, sample_manifest):
-        """pin_offset larger than history size returns the oldest available piece."""
-        mock_post.return_value = self._mock_response(theme="only piece")
-        plugin = self._make_plugin(base_config, sample_manifest)
-
-        plugin.fetch_data()  # only one piece in history
-        assert len(plugin._history) == 1
-
-        plugin.config = {**base_config, "pin_offset": 99}
-        result = plugin.fetch_data()
-
-        assert result.available is True
-        assert result.data["theme"] == "only piece"

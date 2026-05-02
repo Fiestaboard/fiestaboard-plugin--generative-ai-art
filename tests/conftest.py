@@ -37,6 +37,4 @@ def base_config():
         "device_type": "flagship",
         "temperature": 1.2,
         "refresh_seconds": 300,
-        "history_size": 100,
-        "persist_history": False,
     }

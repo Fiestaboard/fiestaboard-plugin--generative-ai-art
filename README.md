@@ -10,8 +10,6 @@ Each refresh the plugin asks the model to compose a unique colour-tile compositi
 - Supports both display sizes:
   - **Flagship** — 6 rows × 22 columns
   - **Note** — 3 rows × 15 columns
-- Ring-buffer history of the last N generated pieces (default 100)
-- Optional persistence to disk so the history survives restarts
 - Graceful fallback: if the LLM call fails, the board keeps showing the last successful piece
 - Configurable refresh interval, temperature, and custom theme list
 
@@ -25,8 +23,6 @@ Each refresh the plugin asks the model to compose a unique colour-tile compositi
 | `device_type` | `flagship` \| `note` | `flagship` | Target display size. |
 | `temperature` | number 0–2 | `1.2` | Sampling temperature. 1.0–1.4 works well for art. |
 | `refresh_seconds` | integer ≥300 | `1800` | How often to generate a new piece (minimum 5 minutes). |
-| `history_size` | integer 1–500 | `100` | Number of past pieces to remember. |
-| `persist_history` | boolean | `true` | Save history to `data/plugins/generative_ai_art/history.json`. |
 | `themes` | string[] | `[]` | Custom theme list. Leave empty to use the 30 built-in themes. |
 | `extra_instructions` | string | `""` | Extra instructions appended to the system prompt (e.g. `"favour cool colours"`). |
 
@@ -40,7 +36,6 @@ Each refresh the plugin asks the model to compose a unique colour-tile compositi
 | `GENERATIVE_AI_ART_DEVICE_TYPE` | `flagship` |
 | `GENERATIVE_AI_ART_TEMPERATURE` | `1.2` |
 | `GENERATIVE_AI_ART_REFRESH_SECONDS` | `1800` |
-| `GENERATIVE_AI_ART_HISTORY_SIZE` | `100` |
 
 ## Template variables
 
@@ -51,7 +46,6 @@ Each refresh the plugin asks the model to compose a unique colour-tile compositi
 | `generative_ai_art.description` | One-sentence artist's description |
 | `generative_ai_art.model` | Model that generated the piece |
 | `generative_ai_art.generated_at` | ISO timestamp |
-| `generative_ai_art.history_count` | Number of pieces in history |
 
 ## Installation
 

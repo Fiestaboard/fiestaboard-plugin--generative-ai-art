@@ -1,7 +1,7 @@
 {
   "id": "generative_ai_art",
   "name": "Generative AI Art",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Generate full-screen abstract art for your split-flap display using an LLM. Each piece is a unique, thought-out composition using the board's 8-color palette.",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--generative-ai-art",
@@ -56,34 +56,6 @@
         "description": "How often to generate a new art piece. Minimum 300 seconds (5 minutes).",
         "default": 300,
         "minimum": 300
-      },
-      "paused": {
-        "type": "boolean",
-        "title": "Pause Auto-Generation",
-        "description": "Stop generating new art. The board keeps showing the current piece.",
-        "default": false
-      },
-      "pin_offset": {
-        "type": "integer",
-        "title": "Show Historical Piece",
-        "description": "0 = latest piece, 1 = previous piece, 2 = two pieces ago, etc. Non-zero values pause auto-generation.",
-        "default": 0,
-        "minimum": 0,
-        "maximum": 499
-      },
-      "history_size": {
-        "type": "integer",
-        "title": "History Size",
-        "description": "Number of generated art pieces to remember (1–500)",
-        "default": 100,
-        "minimum": 1,
-        "maximum": 500
-      },
-      "persist_history": {
-        "type": "boolean",
-        "title": "Persist History",
-        "description": "Save art history to disk so it survives restarts",
-        "default": true
       },
       "themes": {
         "type": "array",
@@ -145,12 +117,6 @@
       "description": "Refresh interval in seconds (minimum 300)",
       "default": "1800"
     },
-    {
-      "name": "GENERATIVE_AI_ART_HISTORY_SIZE",
-      "required": false,
-      "description": "Number of art pieces to retain in history",
-      "default": "100"
-    }
   ],
   "variables": {
     "groups": {
@@ -197,13 +163,6 @@
         "group": "meta",
         "example": "2026-05-02T14:30:00"
       },
-      "history_count": {
-        "description": "Number of art pieces in history",
-        "type": "integer",
-        "max_length": 3,
-        "group": "meta",
-        "example": "42"
-      }
     }
   },
   "fiestaboard_version": ">=2.10.0",
