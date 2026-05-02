@@ -9,7 +9,7 @@ def sample_manifest():
     return {
         "id": "generative_ai_art",
         "name": "Generative AI Art",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "description": "Test",
         "author": "FiestaBoard Team",
         "min_refresh_seconds": 300,
@@ -18,7 +18,7 @@ def sample_manifest():
             "properties": {
                 "refresh_seconds": {
                     "type": "integer",
-                    "default": 1800,
+                    "default": 300,
                     "minimum": 300,
                 }
             },
@@ -36,7 +36,7 @@ def base_config():
         "model": "gpt-4o-mini",
         "device_type": "flagship",
         "temperature": 1.2,
-        "refresh_seconds": 1800,
+        "refresh_seconds": 300,
         "history_size": 100,
         "persist_history": False,
     }

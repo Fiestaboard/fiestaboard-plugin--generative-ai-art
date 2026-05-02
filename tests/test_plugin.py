@@ -210,7 +210,7 @@ class TestPluginValidateConfig:
         self.manifest = {
             "id": "generative_ai_art",
             "name": "Test",
-            "version": "1.0.0",
+            "version": "1.1.0",
             "description": "",
             "author": "",
             "min_refresh_seconds": 300,
@@ -476,3 +476,104 @@ class TestBuiltinThemes:
     def test_builtin_themes_all_strings(self):
         for theme in BUILTIN_THEMES:
             assert isinstance(theme, str) and theme.strip()
+
+
+# ---------------------------------------------------------------------------
+# Plugin: paused and pin_offset behaviour
+# ---------------------------------------------------------------------------
+
+class TestPausedAndPin:
+    """Tests for paused flag and pin_offset field in fetch_data."""
+
+    def _make_plugin(self, base_config, manifest):
+        plugin = GenerativeAiArtPlugin(manifest)
+        plugin.config = base_config
+        return plugin
+
+    def _mock_response(self, theme: str = "ocean waves") -> MagicMock:
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {
+            "choices": [{"message": {"content": _valid_response(theme=theme)}}]
+        }
+        return mock_resp
+
+    @patch("plugins.generative_ai_art.source.requests.post")
+    def test_paused_returns_latest_history_piece(self, mock_post, base_config, sample_manifest):
+        """When paused=True and history has entries, the latest piece is returned."""
+        mock_post.return_value = self._mock_response(theme="first")
+        plugin = self._make_plugin(base_config, sample_manifest)
+
+        # Generate one piece to populate history
+        first = plugin.fetch_data()
+        assert first.available is True
+
+        # Pause — no new HTTP call should happen
+        plugin.config = {**base_config, "paused": True}
+        result = plugin.fetch_data()
+
+        assert result.available is True
+        assert result.data["theme"] == "first"
+        # Only 1 HTTP call total (the initial generation)
+        assert mock_post.call_count == 1
+
+    @patch("plugins.generative_ai_art.source.requests.post")
+    def test_paused_with_empty_history_falls_through_to_generate(
+        self, mock_post, base_config, sample_manifest
+    ):
+        """When paused=True but history is empty, generation runs once."""
+        mock_post.return_value = self._mock_response(theme="bootstrap")
+        base_config_paused = {**base_config, "paused": True}
+        plugin = self._make_plugin(base_config_paused, sample_manifest)
+
+        result = plugin.fetch_data()
+
+        assert result.available is True
+        assert mock_post.call_count == 1
+
+    @patch("plugins.generative_ai_art.source.requests.post")
+    def test_pin_offset_zero_returns_latest(self, mock_post, base_config, sample_manifest):
+        """pin_offset=0 (with paused=False) falls through to generation normally."""
+        mock_post.return_value = self._mock_response(theme="latest")
+        plugin = self._make_plugin({**base_config, "pin_offset": 0}, sample_manifest)
+
+        result = plugin.fetch_data()
+        assert result.available is True
+        assert mock_post.call_count == 1
+
+    @patch("plugins.generative_ai_art.source.requests.post")
+    def test_pin_offset_returns_older_piece(self, mock_post, base_config, sample_manifest):
+        """pin_offset=1 returns the second-to-last history entry."""
+        mock_post.side_effect = [
+            self._mock_response(theme="first piece"),
+            self._mock_response(theme="second piece"),
+        ]
+        plugin = self._make_plugin(base_config, sample_manifest)
+
+        plugin.fetch_data()  # first piece
+        plugin.fetch_data()  # second piece
+        assert len(plugin._history) == 2
+
+        # Now pin to offset 1 (one piece back = "first piece")
+        plugin.config = {**base_config, "pin_offset": 1}
+        result = plugin.fetch_data()
+
+        assert result.available is True
+        assert result.data["theme"] == "first piece"
+        # No additional HTTP call
+        assert mock_post.call_count == 2
+
+    @patch("plugins.generative_ai_art.source.requests.post")
+    def test_pin_offset_clamped_to_oldest(self, mock_post, base_config, sample_manifest):
+        """pin_offset larger than history size returns the oldest available piece."""
+        mock_post.return_value = self._mock_response(theme="only piece")
+        plugin = self._make_plugin(base_config, sample_manifest)
+
+        plugin.fetch_data()  # only one piece in history
+        assert len(plugin._history) == 1
+
+        plugin.config = {**base_config, "pin_offset": 99}
+        result = plugin.fetch_data()
+
+        assert result.available is True
+        assert result.data["theme"] == "only piece"

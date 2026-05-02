@@ -112,7 +112,11 @@ class GenerativeAiArtPlugin(PluginBase):
     def fetch_data(self) -> PluginResult:
         """Generate a new art piece and return it as plugin data.
 
-        On failure returns the last known good piece if available, or marks
+        If ``paused`` is True or ``pin_offset`` is non-zero the plugin returns
+        a piece from history without calling the LLM.  If history is empty it
+        falls through to generation so the board always has something to show.
+
+        On LLM failure returns the last known good piece if available, or marks
         the plugin as unavailable if history is empty.
         """
         cfg = self.config
@@ -122,6 +126,14 @@ class GenerativeAiArtPlugin(PluginBase):
         generator = self._get_generator()
         if generator is None:
             return PluginResult(available=False, error="Art generator could not be initialised")
+
+        paused = bool(cfg.get("paused", False))
+        pin_offset = int(cfg.get("pin_offset", 0))
+
+        if (paused or pin_offset > 0) and self._history:
+            hist = list(self._history)
+            idx = min(pin_offset, len(hist) - 1)
+            return PluginResult(available=True, data=self._record_to_data(hist[-(idx + 1)]))
 
         piece = generator.generate()
 
