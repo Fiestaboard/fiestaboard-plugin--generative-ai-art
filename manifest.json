@@ -1,0 +1,232 @@
+{
+  "id": "generative_ai_art",
+  "name": "Generative AI Art",
+  "version": "1.0.0",
+  "description": "Generate full-screen abstract art for your split-flap display using an LLM. Each piece is a unique, thought-out composition using the board's 8-color palette.",
+  "author": "FiestaBoard Team",
+  "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--generative-ai-art",
+  "documentation": "README.md",
+  "icon": "palette",
+  "category": "art",
+  "min_refresh_seconds": 300,
+  "settings_schema": {
+    "type": "object",
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "title": "Enable Generative AI Art",
+        "default": false
+      },
+      "api_base_url": {
+        "type": "string",
+        "title": "API Base URL",
+        "description": "Base URL for an OpenAI-compatible chat completions endpoint (e.g. https://api.openai.com/v1 or http://localhost:11434/v1 for Ollama)",
+        "default": "https://api.openai.com/v1"
+      },
+      "api_key": {
+        "type": "string",
+        "title": "API Key",
+        "description": "API key for the endpoint. Use any value (e.g. 'ollama') for local endpoints that don't require auth.",
+        "secret": true
+      },
+      "model": {
+        "type": "string",
+        "title": "Model",
+        "description": "Model to use for art generation",
+        "default": "gpt-4o-mini"
+      },
+      "device_type": {
+        "type": "string",
+        "title": "Device Type",
+        "description": "Target display size: flagship (6 rows × 22 cols) or note (3 rows × 15 cols)",
+        "enum": ["flagship", "note"],
+        "default": "flagship"
+      },
+      "temperature": {
+        "type": "number",
+        "title": "Temperature",
+        "description": "LLM sampling temperature (0 = deterministic, 2 = very random). 1.0–1.4 works well for art.",
+        "default": 1.2,
+        "minimum": 0,
+        "maximum": 2
+      },
+      "refresh_seconds": {
+        "type": "integer",
+        "title": "Refresh Interval (seconds)",
+        "description": "How often to generate a new art piece. Minimum 300 seconds (5 minutes).",
+        "default": 1800,
+        "minimum": 300
+      },
+      "history_size": {
+        "type": "integer",
+        "title": "History Size",
+        "description": "Number of generated art pieces to remember (1–500)",
+        "default": 100,
+        "minimum": 1,
+        "maximum": 500
+      },
+      "persist_history": {
+        "type": "boolean",
+        "title": "Persist History",
+        "description": "Save art history to disk so it survives restarts",
+        "default": true
+      },
+      "themes": {
+        "type": "array",
+        "title": "Custom Themes",
+        "description": "Optional list of theme prompts. Leave empty to use the built-in theme pool.",
+        "items": {
+          "type": "string"
+        },
+        "default": []
+      },
+      "extra_instructions": {
+        "type": "string",
+        "title": "Extra Prompt Instructions",
+        "description": "Additional instructions appended to the system prompt (e.g. 'favor cool colors' or 'avoid red entirely')",
+        "default": ""
+      }
+    },
+    "required": ["api_key"]
+  },
+  "env_vars": [
+    {
+      "name": "GENERATIVE_AI_ART_ENABLED",
+      "required": false,
+      "description": "Enable generative AI art plugin",
+      "default": "false"
+    },
+    {
+      "name": "GENERATIVE_AI_ART_API_KEY",
+      "required": false,
+      "description": "API key for the OpenAI-compatible endpoint"
+    },
+    {
+      "name": "GENERATIVE_AI_ART_API_BASE_URL",
+      "required": false,
+      "description": "Base URL for the chat completions endpoint",
+      "default": "https://api.openai.com/v1"
+    },
+    {
+      "name": "GENERATIVE_AI_ART_MODEL",
+      "required": false,
+      "description": "Model name to use",
+      "default": "gpt-4o-mini"
+    },
+    {
+      "name": "GENERATIVE_AI_ART_DEVICE_TYPE",
+      "required": false,
+      "description": "Target device type: flagship or note",
+      "default": "flagship"
+    },
+    {
+      "name": "GENERATIVE_AI_ART_TEMPERATURE",
+      "required": false,
+      "description": "Sampling temperature (0.0–2.0)",
+      "default": "1.2"
+    },
+    {
+      "name": "GENERATIVE_AI_ART_REFRESH_SECONDS",
+      "required": false,
+      "description": "Refresh interval in seconds (minimum 300)",
+      "default": "1800"
+    },
+    {
+      "name": "GENERATIVE_AI_ART_HISTORY_SIZE",
+      "required": false,
+      "description": "Number of art pieces to retain in history",
+      "default": "100"
+    }
+  ],
+  "variables": {
+    "groups": {
+      "display": {
+        "label": "Display"
+      },
+      "meta": {
+        "label": "Metadata"
+      }
+    },
+    "simple": {
+      "art": {
+        "description": "Full-board color art pattern ready for display",
+        "type": "string",
+        "max_length": 512,
+        "group": "display",
+        "example": "{blue}{violet}{blue}..."
+      },
+      "theme": {
+        "description": "Theme or concept of the current art piece",
+        "type": "string",
+        "max_length": 50,
+        "group": "meta",
+        "example": "concentric rings"
+      },
+      "description": {
+        "description": "Short artist's description of the current piece",
+        "type": "string",
+        "max_length": 100,
+        "group": "meta",
+        "example": "Radiating rings of cool blues fading to deep violet"
+      },
+      "model": {
+        "description": "LLM model that generated this piece",
+        "type": "string",
+        "max_length": 40,
+        "group": "meta",
+        "example": "gpt-4o-mini"
+      },
+      "generated_at": {
+        "description": "ISO timestamp when this piece was generated",
+        "type": "string",
+        "max_length": 20,
+        "group": "meta",
+        "example": "2026-05-02T14:30:00"
+      },
+      "history_count": {
+        "description": "Number of art pieces in history",
+        "type": "integer",
+        "max_length": 3,
+        "group": "meta",
+        "example": "42"
+      }
+    }
+  },
+  "fiestaboard_version": ">=2.10.0",
+  "demos": [
+    {
+      "name": "Generative AI Art (Flagship)",
+      "device_type": "flagship",
+      "template": [
+        "{{generative_ai_art.art}}",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "line_metadata": [
+        {"alignment": "left", "wrap": true},
+        {"alignment": "left", "wrap": false},
+        {"alignment": "left", "wrap": false},
+        {"alignment": "left", "wrap": false},
+        {"alignment": "left", "wrap": false},
+        {"alignment": "left", "wrap": false}
+      ]
+    },
+    {
+      "name": "Generative AI Art (Note)",
+      "device_type": "note",
+      "template": [
+        "{{generative_ai_art.art}}",
+        "",
+        ""
+      ],
+      "line_metadata": [
+        {"alignment": "left", "wrap": true},
+        {"alignment": "left", "wrap": false},
+        {"alignment": "left", "wrap": false}
+      ]
+    }
+  ]
+}
