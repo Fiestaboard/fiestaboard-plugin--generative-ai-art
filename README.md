@@ -2,7 +2,7 @@
 
 A [FiestaBoard](https://github.com/Fiestaboard/FiestaBoard) plugin that generates full-screen abstract art for your split-flap display using any OpenAI-compatible LLM.
 
-Each refresh the plugin asks the model to compose a unique colour-tile composition using the board's 8-colour palette, following a rotating set of artistic themes (concentric rings, mountain silhouettes, aurora borealis, Mondrian-style blocks, and 26 others).
+Each refresh the plugin asks the model to compose a unique colour-tile composition using the board's 8-colour palette, following a rotating set of 63 artistic themes (concentric rings, mountain silhouettes, aurora borealis, Mondrian-style blocks, and many more).
 
 ## Features
 
@@ -23,8 +23,9 @@ Each refresh the plugin asks the model to compose a unique colour-tile compositi
 | `device_type` | `flagship` \| `note` | `flagship` | Target display size. |
 | `temperature` | number 0–2 | `1.2` | Sampling temperature. 1.0–1.4 works well for art. |
 | `refresh_seconds` | integer ≥300 | `1800` | How often to generate a new piece (minimum 5 minutes). |
-| `themes` | string[] | `[]` | Custom theme list. Leave empty to use the 30 built-in themes. |
-| `extra_instructions` | string | `""` | Extra instructions appended to the system prompt (e.g. `"favour cool colours"`). |
+| `themes` | string[] | `[]` | Custom theme list. Leave empty to use the 63 built-in themes. |
+| `extra_instructions` | string | `""` | Extra instructions appended to the built-in system prompt (e.g. `"favour cool colours"`). Ignored when `custom_system_prompt` is set. |
+| `custom_system_prompt` | string | `""` | Override the entire system prompt sent to the LLM. Leave blank to use the built-in prompt. Call `generator.build_default_system_prompt()` to inspect the default. |
 
 ### Environment-variable overrides
 

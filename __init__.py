@@ -137,6 +137,7 @@ class GenerativeAiArtPlugin(PluginBase):
             device_type=cfg.get("device_type", "flagship"),
             themes=themes if isinstance(themes, list) else [],
             extra_instructions=cfg.get("extra_instructions", ""),
+            custom_system_prompt=cfg.get("custom_system_prompt", ""),
         )
 
         return self._generator

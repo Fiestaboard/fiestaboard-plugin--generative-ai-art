@@ -34,36 +34,73 @@ VALID_COLORS = set(COLOR_LETTERS.keys())
 
 # Built-in theme pool — varied enough to produce very different compositions
 BUILTIN_THEMES = [
+    # --- Geometric / structural ---
     "concentric rings expanding from the center",
     "diagonal color gradient from corner to corner",
     "bold geometric chevrons or zigzags",
-    "abstract mountain silhouette with sky gradient",
-    "symmetrical mandala-like pattern",
+    "symmetrical mandala-like radial pattern",
     "horizontal banded color field with a focal accent",
     "vertical columns of alternating color families",
     "color-block abstraction inspired by Mondrian",
-    "scattered irregular patches like a mosaic",
-    "wave interference pattern — overlapping sine-like curves",
-    "radial spoke pattern emanating from one corner",
-    "pixel landscape: ground, horizon, sky layers",
     "checkerboard variant with irregular cell sizes",
     "two large opposing diagonal color fields",
-    "blurred organic blob cluster in the center",
-    "flowing river of a single bright color on a dark ground",
     "staircase terracing pattern from bottom-left",
-    "heatmap-style gradient: cool edges, warm center",
-    "sparse pointillist dots on a solid background",
-    "bold typographic-inspired abstract shapes",
-    "aurora borealis: vertical curtains of color",
-    "sunset horizon with layered warm and cool bands",
-    "circuit board: right-angle lines on dark ground",
-    "random walk path of a bright color on neutral",
     "diamond lattice with alternating fill colors",
-    "underwater: light shafts descending through blue-green",
-    "stained glass: irregular polygons in contrasting colors",
-    "storm cell: dark vortex with electric accent colors",
-    "desert dunes: warm earth tones with cool shadow",
+    "isometric cube illusion using three tones",
+    "op-art concentric squares with high contrast",
+    "bold offset stripes at 45 degrees",
+    "herringbone weave pattern",
+    "interlocking brick or basketweave pattern",
+    "radial spoke pattern emanating from one corner",
+    "plaid or tartan: horizontal and vertical bands crossing",
+    "Bauhaus-style composition: rectangles, circles, lines",
+    "triangle grid — large and small contrasting triangles",
+    "pixel grid of 2×2 color blocks in a structured palette",
+    # --- Nature / landscape ---
+    "abstract mountain silhouette with sky gradient",
+    "aurora borealis: vertical curtains of shifting color",
+    "sunset horizon with layered warm and cool bands",
+    "desert dunes: warm earth tones with cool shadow bands",
     "cityscape silhouette: dark blocks on gradient sky",
+    "pixel landscape: ground, horizon, sky layers",
+    "underwater: light shafts descending through blue-green",
+    "storm cell: dark vortex with electric accent colors",
+    "volcanic landscape: black ground, orange glow, dark sky",
+    "coral reef cross-section: layered warm and cool patches",
+    "autumn forest floor: scattered warm patches on dark ground",
+    "tidal pool reflection: mirrored bands with shimmer accent",
+    "twilight sky fading from orange at the horizon to deep violet",
+    "cloud formations: soft rounded masses on a gradient sky",
+    "glacier: cool blues and whites with deep crevasse shadows",
+    "night sky with a bright horizon glow",
+    # --- Texture / pattern ---
+    "scattered irregular patches like a mosaic",
+    "wave interference pattern — overlapping sine-like curves",
+    "stained glass: irregular polygons in contrasting colors",
+    "circuit board: right-angle traces on a dark ground",
+    "random walk path of a bright color on a neutral field",
+    "heatmap-style gradient: cool edges, warm center",
+    "sparse pointillist dots on a contrasting background",
+    "blurred organic blob cluster in the center",
+    "lava-lamp: rounded blobs of warm color on cool ground",
+    "topographic contour lines on a single-hue gradient",
+    "woven textile: tight alternating thread colors",
+    "noise field: irregular dithered color patches",
+    "kaleidoscope mirror reflection",
+    "seed-of-life sacred geometry circles",
+    # --- Abstract / painterly ---
+    "flowing river of a single bright color on a dark ground",
+    "bold typographic-inspired abstract shapes",
+    "horizontal banded color field — Mark Rothko-style",
+    "abstract expressionist color field: large loose brushstroke blocks",
+    "color spectrum arc from cool to warm",
+    "neon sign glow: bright lines and halos on dark background",
+    "patchwork quilt: irregular rectangles in a warm palette",
+    "butterfly wing symmetry: mirrored left-right composition",
+    "color gradient snake path winding across the board",
+    "bold racing stripes: two or three wide parallel bands",
+    "Japanese wave pattern: repeating curved arcs in blue",
+    "retro video-game sprite: bright pixel art on dark background",
 ]
 
 
@@ -100,6 +137,7 @@ class ArtGenerator:
         device_type: str = "flagship",
         themes: Optional[List[str]] = None,
         extra_instructions: str = "",
+        custom_system_prompt: str = "",
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -109,6 +147,7 @@ class ArtGenerator:
         self.rows, self.cols = self.DEVICE_DIMENSIONS[self.device_type]
         self.themes = themes if themes else BUILTIN_THEMES
         self.extra_instructions = extra_instructions.strip()
+        self.custom_system_prompt = custom_system_prompt.strip()
 
     # ------------------------------------------------------------------
     # Public API
@@ -164,14 +203,17 @@ class ArtGenerator:
             choices = self.themes
         return random.choice(choices)
 
-    def _build_messages(self, theme: str) -> List[Dict[str, str]]:
-        """Build the messages list for the chat completions request."""
+    def build_default_system_prompt(self) -> str:
+        """Return the auto-generated system prompt for the current configuration.
+
+        Exposed publicly so callers can show the user what will be sent.
+        """
         color_table = "\n".join(
             f"  {letter} = {marker.strip('{}')}"
             for letter, marker in COLOR_LETTERS.items()
         )
 
-        system = f"""You are a generative-art composer for a physical split-flap display.
+        prompt = f"""You are a generative-art composer for a physical split-flap display.
 The display uses ONLY the following 8 colors, identified by single capital letters:
 
 {color_table}
@@ -207,6 +249,12 @@ OUTPUT FORMAT (strict JSON, no other text):
   ]
 }}
 {('\\n' + self.extra_instructions) if self.extra_instructions else ''}"""
+
+        return prompt
+
+    def _build_messages(self, theme: str) -> List[Dict[str, str]]:
+        """Build the messages list for the chat completions request."""
+        system = self.custom_system_prompt if self.custom_system_prompt else self.build_default_system_prompt()
 
         user = (
             f"Compose an art piece with this theme: {theme}\n\n"

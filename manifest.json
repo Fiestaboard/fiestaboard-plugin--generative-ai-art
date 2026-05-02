@@ -1,7 +1,7 @@
 {
   "id": "generative_ai_art",
   "name": "Generative AI Art",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Generate full-screen abstract art for your split-flap display using an LLM. Each piece is a unique, thought-out composition using the board's 8-color palette.",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--generative-ai-art",
@@ -70,6 +70,14 @@
         "type": "string",
         "title": "Extra Prompt Instructions",
         "description": "Additional instructions appended to the system prompt (e.g. 'favor cool colors' or 'avoid red entirely')",
+        "format": "textarea",
+        "default": ""
+      },
+      "custom_system_prompt": {
+        "type": "string",
+        "title": "Custom System Prompt",
+        "description": "Override the full system prompt sent to the LLM. Leave blank to use the built-in prompt. When set, Extra Prompt Instructions is ignored. Use the plugin's build_default_system_prompt() method to see the default.",
+        "format": "textarea",
         "default": ""
       }
     },
