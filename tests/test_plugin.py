@@ -1,6 +1,7 @@
 """Tests for generative_ai_art plugin."""
 
 import json
+from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -33,13 +34,21 @@ def _make_grid_two_colors(rows: int, cols: int) -> list:
     return grid
 
 
-def _valid_response(theme: str = "test theme", rows: int = 6, cols: int = 22) -> str:
+def _valid_response(
+    theme: str = "test theme",
+    rows: int = 6,
+    cols: int = 22,
+    title: Optional[str] = None,
+) -> str:
     """Return a valid JSON response string."""
-    return json.dumps({
+    d: dict = {
         "theme": theme,
         "description": "A test composition",
         "grid": _make_grid_two_colors(rows, cols),
-    })
+    }
+    if title is not None:
+        d["title"] = title
+    return json.dumps(d)
 
 
 # ---------------------------------------------------------------------------
@@ -375,4 +384,164 @@ class TestBuiltinThemes:
     def test_builtin_themes_all_strings(self):
         for theme in BUILTIN_THEMES:
             assert isinstance(theme, str) and theme.strip()
+
+
+# ---------------------------------------------------------------------------
+# show_title: validation
+# ---------------------------------------------------------------------------
+
+class TestShowTitleValidation:
+    """Tests for ArtGenerator._validate_and_parse when show_title=True."""
+
+    def setup_method(self):
+        self.gen = ArtGenerator(
+            base_url="https://api.example.com/v1",
+            api_key="sk-test",
+            model="gpt-4o-mini",
+            temperature=1.0,
+            device_type="flagship",
+            show_title=True,
+        )
+
+    def test_valid_response_with_title(self):
+        # art uses rows-1 = 5 rows; grid is 5×22
+        raw = _valid_response(rows=5, cols=22, title="AURORA")
+        result = self.gen._validate_and_parse(raw)
+        assert result["title"] == "AURORA"
+        assert len(result["grid"]) == 5
+
+    def test_missing_title_key_rejected(self):
+        raw = _valid_response(rows=5, cols=22)  # no title field
+        with pytest.raises(ArtValidationError, match="Missing required key: 'title'"):
+            self.gen._validate_and_parse(raw)
+
+    def test_title_too_long_rejected(self):
+        long_title = "A" * 23  # exceeds 22 cols
+        raw = _valid_response(rows=5, cols=22, title=long_title)
+        with pytest.raises(ArtValidationError, match="only 22 columns wide"):
+            self.gen._validate_and_parse(raw)
+
+    def test_title_at_max_length_accepted(self):
+        max_title = "A" * 22  # exactly 22 chars — fits
+        raw = _valid_response(rows=5, cols=22, title=max_title)
+        result = self.gen._validate_and_parse(raw)
+        assert result["title"] == max_title
+
+    def test_wrong_row_count_with_title_enabled(self):
+        # Should expect 5 rows (rows-1), not 6
+        raw = _valid_response(rows=6, cols=22, title="TEST")
+        with pytest.raises(ArtValidationError, match="Expected 5 rows"):
+            self.gen._validate_and_parse(raw)
+
+    def test_note_device_with_title(self):
+        gen = ArtGenerator(
+            base_url="https://api.example.com/v1",
+            api_key="sk-test",
+            model="gpt-4o-mini",
+            temperature=1.0,
+            device_type="note",
+            show_title=True,
+        )
+        # note is 3×15; art rows = 2
+        raw = _valid_response(rows=2, cols=15, title="WAVES")
+        result = gen._validate_and_parse(raw)
+        assert len(result["grid"]) == 2
+        assert result["title"] == "WAVES"
+
+    def test_non_string_title_rejected(self):
+        raw = json.dumps({
+            "theme": "t",
+            "description": "d",
+            "grid": _make_grid_two_colors(5, 22),
+            "title": 42,  # not a string
+        })
+        with pytest.raises(ArtValidationError, match="'title' must be a string"):
+            self.gen._validate_and_parse(raw)
+
+
+# ---------------------------------------------------------------------------
+# show_title: art string output
+# ---------------------------------------------------------------------------
+
+class TestShowTitleArtString:
+    """Tests for _grid_to_art_string and generate() with show_title=True."""
+
+    def setup_method(self):
+        self.gen = ArtGenerator(
+            base_url="https://api.example.com/v1",
+            api_key="sk-test",
+            model="gpt-4o-mini",
+            temperature=1.0,
+            device_type="flagship",
+            show_title=True,
+        )
+
+    def test_title_row_appended(self):
+        grid = _make_grid_two_colors(5, 22)
+        art = self.gen._grid_to_art_string(grid, title="aurora")
+        lines = art.split("\n")
+        # 5 art rows + 1 title row = 6 lines total
+        assert len(lines) == 6
+
+    def test_title_row_is_centered_uppercase(self):
+        grid = _make_grid_two_colors(5, 22)
+        art = self.gen._grid_to_art_string(grid, title="aurora")
+        title_line = art.split("\n")[-1]
+        assert title_line == "aurora".upper().center(22)
+        assert len(title_line) == 22
+
+    def test_system_prompt_reflects_show_title(self):
+        prompt = self.gen.build_default_system_prompt()
+        # Art grid should be 5 rows (rows-1), not 6
+        assert "EXACTLY 5 rows" in prompt
+        # Full board size still mentioned for context
+        assert "6-row" in prompt
+        # Title field present in rules and JSON format
+        assert '"title"' in prompt
+
+    def test_system_prompt_without_show_title_has_no_title_field(self):
+        gen = ArtGenerator(
+            base_url="https://api.example.com/v1",
+            api_key="sk-test",
+            model="gpt-4o-mini",
+            temperature=1.0,
+            device_type="flagship",
+            show_title=False,
+        )
+        prompt = gen.build_default_system_prompt()
+        assert "EXACTLY 6 rows" in prompt
+        assert '"title"' not in prompt
+
+    def test_no_title_row_without_show_title(self):
+        gen = ArtGenerator(
+            base_url="https://api.example.com/v1",
+            api_key="sk-test",
+            model="gpt-4o-mini",
+            temperature=1.0,
+            device_type="flagship",
+            show_title=False,
+        )
+        grid = _make_grid_two_colors(6, 22)
+        art = gen._grid_to_art_string(grid, title="should be ignored")
+        assert art.count("\n") == 5  # 6 rows → 5 newlines, no title row
+
+    @patch("plugins.generative_ai_art.source.requests.post")
+    def test_fetch_data_with_show_title(self, mock_post, base_config, sample_manifest):
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {
+            "choices": [{"message": {"content": _valid_response(rows=5, cols=22, title="OCEAN")}}]
+        }
+        mock_post.return_value = mock_resp
+
+        from plugins.generative_ai_art import GenerativeAiArtPlugin
+        plugin = GenerativeAiArtPlugin(sample_manifest)
+        base_config["show_title"] = True
+        plugin.config = base_config
+
+        result = plugin.fetch_data()
+        assert result.available is True
+        lines = result.data["art"].split("\n")
+        assert len(lines) == 6
+        assert lines[-1].strip() == "OCEAN"
 

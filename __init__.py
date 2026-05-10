@@ -138,6 +138,7 @@ class GenerativeAiArtPlugin(PluginBase):
             themes=themes if isinstance(themes, list) else [],
             extra_instructions=cfg.get("extra_instructions", ""),
             custom_system_prompt=cfg.get("custom_system_prompt", ""),
+            show_title=bool(cfg.get("show_title", False)),
         )
 
         return self._generator

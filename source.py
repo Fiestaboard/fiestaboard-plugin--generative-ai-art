@@ -138,6 +138,7 @@ class ArtGenerator:
         themes: Optional[List[str]] = None,
         extra_instructions: str = "",
         custom_system_prompt: str = "",
+        show_title: bool = False,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -148,6 +149,12 @@ class ArtGenerator:
         self.themes = themes if themes else BUILTIN_THEMES
         self.extra_instructions = extra_instructions.strip()
         self.custom_system_prompt = custom_system_prompt.strip()
+        self.show_title = show_title
+
+    @property
+    def _art_rows(self) -> int:
+        """Rows used for the color art grid (excludes title row when enabled)."""
+        return self.rows - 1 if self.show_title else self.rows
 
     # ------------------------------------------------------------------
     # Public API
@@ -174,7 +181,7 @@ class ArtGenerator:
                     "theme": parsed["theme"],
                     "description": parsed["description"],
                     "grid": parsed["grid"],
-                    "art": self._grid_to_art_string(parsed["grid"]),
+                    "art": self._grid_to_art_string(parsed["grid"], parsed.get("title", "")),
                 }
             except ArtValidationError as exc:
                 logger.warning(
@@ -213,23 +220,40 @@ class ArtGenerator:
             for letter, marker in COLOR_LETTERS.items()
         )
 
+        art_rows = self._art_rows
+
+        if self.show_title:
+            task_line = (
+                f"Your task is to compose an abstract art piece that fills the top {art_rows} rows "
+                f"of a {self.rows}-row × {self.cols}-column grid. "
+                f"The bottom row is reserved for a short title you will provide."
+            )
+            title_rule = f"\n7. Include a \"title\" field: a short label for the piece, maximum {self.cols} characters."
+            title_json_field = f',\n  "title": "<short label, max {self.cols} characters>"'
+        else:
+            task_line = (
+                f"Your task is to compose a full-screen abstract art piece that fills every cell "
+                f"of the {self.rows}-row × {self.cols}-column grid."
+            )
+            title_rule = ""
+            title_json_field = ""
+
         prompt = f"""You are a generative-art composer for a physical split-flap display.
 The display uses ONLY the following 8 colors, identified by single capital letters:
 
 {color_table}
 
-Your task is to compose a full-screen abstract art piece that fills every cell of the \
-{self.rows}-row × {self.cols}-column grid.
+{task_line}
 
 RULES (non-negotiable):
 1. Output ONLY valid JSON — no markdown fences, no prose before or after.
-2. The "grid" array must contain EXACTLY {self.rows} rows.
+2. The "grid" array must contain EXACTLY {art_rows} rows.
 3. Every row must contain EXACTLY {self.cols} elements.
 4. Every element must be one of: R O Y G B V W K
 5. Use AT LEAST 2 distinct colors and AT MOST 6 distinct colors per piece.
 6. The piece must have intentional visual structure — a focal point, balance, \
 rhythm, or clear compositional logic. It must look like deliberate art, \
-not random noise.
+not random noise.{title_rule}
 
 AESTHETIC GUIDANCE:
 - Choose 2–4 dominant colors and 0–2 accent colors.
@@ -245,10 +269,12 @@ OUTPUT FORMAT (strict JSON, no other text):
   "grid": [
     ["{self.cols} single-letter codes for row 1"],
     ...
-    ["{self.cols} single-letter codes for row {self.rows}"]
-  ]
-}}
-{('\\n' + self.extra_instructions) if self.extra_instructions else ''}"""
+    ["{self.cols} single-letter codes for row {art_rows}"]
+  ]{title_json_field}
+}}"""
+
+        if self.extra_instructions:
+            prompt += "\n" + self.extra_instructions
 
         return prompt
 
@@ -323,17 +349,30 @@ OUTPUT FORMAT (strict JSON, no other text):
             raise ArtValidationError("Response is not a JSON object")
 
         # Validate required keys
-        for key in ("theme", "description", "grid"):
+        required_keys = ("theme", "description", "grid")
+        for key in required_keys:
             if key not in parsed:
                 raise ArtValidationError(f"Missing required key: '{key}'")
+
+        if self.show_title:
+            if "title" not in parsed:
+                raise ArtValidationError("Missing required key: 'title'")
+            title = parsed["title"]
+            if not isinstance(title, str):
+                raise ArtValidationError("'title' must be a string")
+            if len(title) > self.cols:
+                raise ArtValidationError(
+                    f"Title is {len(title)} characters but board is only {self.cols} columns wide"
+                )
 
         grid = parsed["grid"]
         if not isinstance(grid, list):
             raise ArtValidationError("'grid' must be a list")
 
-        if len(grid) != self.rows:
+        art_rows = self._art_rows
+        if len(grid) != art_rows:
             raise ArtValidationError(
-                f"Expected {self.rows} rows, got {len(grid)}"
+                f"Expected {art_rows} rows, got {len(grid)}"
             )
 
         seen_colors: set = set()
@@ -361,17 +400,19 @@ OUTPUT FORMAT (strict JSON, no other text):
 
         return parsed
 
-    def _grid_to_art_string(self, grid: List[List[str]]) -> str:
+    def _grid_to_art_string(self, grid: List[List[str]], title: str = "") -> str:
         """Convert a validated single-letter grid to a FiestaBoard marker string.
 
-        Rows are joined with newlines. Consecutive identical colors are NOT
-        collapsed — each cell is explicit — so the board renderer has full
-        control.
+        Rows are joined with newlines. When show_title is enabled, a centered
+        title row is appended as the last line.
 
         Returns:
-            Multi-line string using ``{color}`` markers.
+            Multi-line string using ``{color}`` markers, with an optional
+            plain-text title as the final row.
         """
         rows = []
         for row in grid:
             rows.append("".join(COLOR_LETTERS[cell] for cell in row))
+        if self.show_title:
+            rows.append(title.upper().center(self.cols))
         return "\n".join(rows)

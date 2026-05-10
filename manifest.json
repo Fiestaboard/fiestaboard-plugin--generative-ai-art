@@ -1,7 +1,7 @@
 {
   "id": "generative_ai_art",
   "name": "Generative AI Art",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Generate full-screen abstract art for your split-flap display using an LLM. Each piece is a unique, thought-out composition using the board's 8-color palette.",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--generative-ai-art",
@@ -79,6 +79,12 @@
         "description": "Override the full system prompt sent to the LLM. Leave blank to use the built-in prompt. When set, Extra Prompt Instructions is ignored. Use the plugin's build_default_system_prompt() method to see the default.",
         "format": "textarea",
         "default": ""
+      },
+      "show_title": {
+        "type": "boolean",
+        "title": "Show Title",
+        "description": "Display a centered title on the bottom row of the board. When enabled, the art fills all rows except the last one.",
+        "default": false
       }
     },
     "required": ["api_key"]
@@ -124,6 +130,12 @@
       "required": false,
       "description": "Refresh interval in seconds (minimum 300)",
       "default": "1800"
+    },
+    {
+      "name": "GENERATIVE_AI_ART_SHOW_TITLE",
+      "required": false,
+      "description": "Show a centered title on the bottom row (true/false)",
+      "default": "false"
     }
   ],
   "variables": {
