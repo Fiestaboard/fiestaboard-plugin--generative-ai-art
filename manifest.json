@@ -1,7 +1,7 @@
 {
   "id": "generative_ai_art",
   "name": "Generative AI Art",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Generate full-screen abstract art for your split-flap display using an LLM. Each piece is a unique, thought-out composition using the board's 8-color palette.",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--generative-ai-art",
@@ -38,14 +38,17 @@
       "device_type": {
         "type": "string",
         "title": "Device Type",
-        "description": "Target display size: flagship (6 rows × 22 cols) or note (3 rows × 15 cols)",
-        "enum": ["flagship", "note"],
+        "description": "Target display size: flagship (6 rows \u00d7 22 cols) or note (3 rows \u00d7 15 cols)",
+        "enum": [
+          "flagship",
+          "note"
+        ],
         "default": "flagship"
       },
       "temperature": {
         "type": "number",
         "title": "Temperature",
-        "description": "LLM sampling temperature (0 = deterministic, 2 = very random). 1.0–1.4 works well for art.",
+        "description": "LLM sampling temperature (0 = deterministic, 2 = very random). 1.0\u20131.4 works well for art.",
         "default": 1.2,
         "minimum": 0,
         "maximum": 2
@@ -87,7 +90,9 @@
         "default": false
       }
     },
-    "required": ["api_key"]
+    "required": [
+      "api_key"
+    ]
   },
   "env_vars": [
     {
@@ -122,7 +127,7 @@
     {
       "name": "GENERATIVE_AI_ART_TEMPERATURE",
       "required": false,
-      "description": "Sampling temperature (0.0–2.0)",
+      "description": "Sampling temperature (0.0\u20132.0)",
       "default": "1.2"
     },
     {
@@ -198,12 +203,30 @@
         ""
       ],
       "line_metadata": [
-        {"alignment": "left", "wrap": true},
-        {"alignment": "left", "wrap": false},
-        {"alignment": "left", "wrap": false},
-        {"alignment": "left", "wrap": false},
-        {"alignment": "left", "wrap": false},
-        {"alignment": "left", "wrap": false}
+        {
+          "alignment": "left",
+          "wrap": true
+        },
+        {
+          "alignment": "left",
+          "wrap": false
+        },
+        {
+          "alignment": "left",
+          "wrap": false
+        },
+        {
+          "alignment": "left",
+          "wrap": false
+        },
+        {
+          "alignment": "left",
+          "wrap": false
+        },
+        {
+          "alignment": "left",
+          "wrap": false
+        }
       ]
     },
     "note": {
@@ -214,9 +237,18 @@
         ""
       ],
       "line_metadata": [
-        {"alignment": "left", "wrap": true},
-        {"alignment": "left", "wrap": false},
-        {"alignment": "left", "wrap": false}
+        {
+          "alignment": "left",
+          "wrap": true
+        },
+        {
+          "alignment": "left",
+          "wrap": false
+        },
+        {
+          "alignment": "left",
+          "wrap": false
+        }
       ]
     }
   }
