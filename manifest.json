@@ -1,7 +1,7 @@
 {
   "id": "generative_ai_art",
   "name": "Generative AI Art",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Generate full-screen abstract art for your split-flap display using an LLM. Each piece is a unique, thought-out composition using the board's 8-color palette.",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--generative-ai-art",
@@ -186,10 +186,9 @@
     }
   },
   "fiestaboard_version": ">=2.10.0",
-  "demos": [
-    {
+  "demo": {
+    "flagship": {
       "name": "Generative AI Art (Flagship)",
-      "device_type": "flagship",
       "template": [
         "{{generative_ai_art.art}}",
         "",
@@ -207,9 +206,8 @@
         {"alignment": "left", "wrap": false}
       ]
     },
-    {
+    "note": {
       "name": "Generative AI Art (Note)",
-      "device_type": "note",
       "template": [
         "{{generative_ai_art.art}}",
         "",
@@ -221,5 +219,5 @@
         {"alignment": "left", "wrap": false}
       ]
     }
-  ]
+  }
 }
