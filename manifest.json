@@ -38,7 +38,7 @@
       "device_type": {
         "type": "string",
         "title": "Device Type",
-        "description": "Target display size: flagship (6 rows \u00d7 22 cols) or note (3 rows \u00d7 15 cols)",
+        "description": "Target display size: flagship (6 rows × 22 cols) or note (3 rows × 15 cols)",
         "enum": [
           "flagship",
           "note"
@@ -48,7 +48,7 @@
       "temperature": {
         "type": "number",
         "title": "Temperature",
-        "description": "LLM sampling temperature (0 = deterministic, 2 = very random). 1.0\u20131.4 works well for art.",
+        "description": "LLM sampling temperature (0 = deterministic, 2 = very random). 1.0–1.4 works well for art.",
         "default": 1.2,
         "minimum": 0,
         "maximum": 2
@@ -127,7 +127,7 @@
     {
       "name": "GENERATIVE_AI_ART_TEMPERATURE",
       "required": false,
-      "description": "Sampling temperature (0.0\u20132.0)",
+      "description": "Sampling temperature (0.0–2.0)",
       "default": "1.2"
     },
     {
@@ -191,6 +191,28 @@
     }
   },
   "fiestaboard_version": ">=2.10.0",
+  "teaser": "{67}{68}{63}{64}{65}{66} AI ART",
+  "previews": [
+    {
+      "device_type": "flagship",
+      "rows": [
+        "{66}{66}{66}{66}{66}{66}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{68}{68}{68}{68}{68}{68}",
+        "{66}{66}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}",
+        "{67}{67}{67}{67}{67}{67}{67}{67}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{63}{63}{63}{63}",
+        "{67}{67}{67}{67}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{63}{63}{63}{63}{63}{63}{63}{63}",
+        "{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{63}{63}{63}{63}{63}{63}{63}{63}{63}{63}{64}{64}",
+        "{68}{68}{68}{68}{68}{68}{63}{63}{63}{63}{63}{63}{63}{63}{63}{63}{64}{64}{64}{64}{64}{64}"
+      ]
+    },
+    {
+      "device_type": "note",
+      "rows": [
+        "{66}{66}{66}{66}{66}{66}{66}{66}{67}{67}{67}{67}{67}{67}{67}",
+        "{66}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{68}",
+        "{67}{67}{67}{67}{67}{67}{67}{68}{68}{68}{68}{68}{68}{68}{68}"
+      ]
+    }
+  ],
   "demo": {
     "flagship": {
       "name": "Generative AI Art (Flagship)",
