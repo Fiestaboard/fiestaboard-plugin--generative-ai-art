@@ -1,8 +1,8 @@
 {
   "id": "generative_ai_art",
   "name": "Generative AI Art",
-  "version": "1.4.2",
-  "description": "Generate full-screen abstract art for your split-flap display using an LLM. Each piece is a unique, thought-out composition using the board's 8-color palette.",
+  "version": "1.4.3",
+  "description": "Generate full-screen abstract art for your split-flap display using an LLM. Each piece is a unique, thought-out composition using the board's 8-color palette, composed for whatever board it lands on — Flagship, Note, or a note array up to 120x24.",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--generative-ai-art",
   "documentation": "README.md",
@@ -34,16 +34,6 @@
         "title": "Model",
         "description": "Model to use for art generation",
         "default": "gpt-4o-mini"
-      },
-      "device_type": {
-        "type": "string",
-        "title": "Device Type",
-        "description": "Target display size: flagship (6 rows × 22 cols) or note (3 rows × 15 cols)",
-        "enum": [
-          "flagship",
-          "note"
-        ],
-        "default": "flagship"
       },
       "temperature": {
         "type": "number",
@@ -79,7 +69,7 @@
       "custom_system_prompt": {
         "type": "string",
         "title": "Custom System Prompt",
-        "description": "Override the full system prompt sent to the LLM. Leave blank to use the built-in prompt. When set, Extra Prompt Instructions is ignored. Use the plugin's build_default_system_prompt() method to see the default.",
+        "description": "Override the full system prompt sent to the LLM. Leave blank to use the built-in prompt, which is written for the board being rendered. When set, Extra Prompt Instructions is ignored, and the same prompt is used on every board — so write it board-agnostically. Use the generator's build_default_system_prompt(canvas) method to see the default.",
         "format": "textarea",
         "default": ""
       },
@@ -119,12 +109,6 @@
       "default": "gpt-4o-mini"
     },
     {
-      "name": "GENERATIVE_AI_ART_DEVICE_TYPE",
-      "required": false,
-      "description": "Target device type: flagship or note",
-      "default": "flagship"
-    },
-    {
       "name": "GENERATIVE_AI_ART_TEMPERATURE",
       "required": false,
       "description": "Sampling temperature (0.0–2.0)",
@@ -154,9 +138,9 @@
     },
     "simple": {
       "art": {
-        "description": "Full-board color art pattern ready for display",
+        "description": "Full-board color art pattern, sized to the board being rendered (one tile per cell, rows separated by newlines)",
         "type": "string",
-        "max_length": 512,
+        "max_length": 2903,
         "group": "display",
         "example": "{blue}{violet}{blue}..."
       },
@@ -210,6 +194,31 @@
         "{66}{66}{66}{66}{66}{66}{66}{66}{67}{67}{67}{67}{67}{67}{67}",
         "{66}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{68}",
         "{67}{67}{67}{67}{67}{67}{67}{68}{68}{68}{68}{68}{68}{68}{68}"
+      ]
+    },
+    {
+      "label": "Note Array 2×2 (panel)",
+      "device_type": "note_array",
+      "notes_wide": 2,
+      "notes_tall": 2,
+      "rows": [
+        "{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}",
+        "{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{65}{65}{65}{67}{67}{67}{67}{67}",
+        "{67}{67}{67}{67}{67}{67}{67}{70}{70}{70}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{65}{65}{65}{67}{67}{67}{67}{67}",
+        "{67}{67}{67}{67}{67}{70}{70}{70}{70}{70}{70}{70}{67}{67}{67}{67}{67}{67}{67}{67}{70}{70}{70}{70}{67}{67}{67}{67}{67}{67}",
+        "{64}{64}{64}{70}{70}{70}{70}{70}{70}{70}{70}{70}{70}{70}{64}{64}{64}{70}{70}{70}{70}{70}{70}{70}{70}{70}{64}{64}{64}{64}",
+        "{66}{66}{66}{70}{70}{70}{70}{66}{66}{66}{66}{66}{66}{66}{66}{66}{66}{66}{66}{66}{66}{66}{66}{70}{70}{70}{70}{66}{66}{66}"
+      ]
+    },
+    {
+      "label": "Note Array 4×1 (wide)",
+      "device_type": "note_array",
+      "notes_wide": 4,
+      "notes_tall": 1,
+      "rows": [
+        "{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{67}{67}{67}{67}{69}{69}{69}{69}{69}{69}{69}{69}{66}{66}{66}{66}{66}{66}{66}{66}{65}{65}{65}{65}{65}{65}{65}{65}{69}{69}{69}{69}{69}{69}{69}{69}{64}{64}{64}{64}{63}{63}{63}{63}{63}{63}{63}{63}{63}{63}",
+        "{69}{69}{68}{68}{68}{68}{68}{68}{68}{68}{69}{69}{69}{69}{67}{67}{67}{67}{67}{67}{66}{66}{69}{69}{69}{69}{66}{66}{66}{66}{65}{65}{65}{65}{69}{69}{69}{69}{65}{65}{64}{64}{64}{64}{64}{64}{69}{69}{69}{69}{63}{63}{63}{63}{63}{63}{63}{63}{69}{69}",
+        "{68}{68}{69}{69}{69}{69}{69}{69}{69}{69}{67}{67}{67}{67}{67}{67}{67}{67}{67}{67}{66}{66}{66}{66}{66}{66}{69}{69}{69}{69}{69}{69}{69}{69}{65}{65}{65}{65}{65}{65}{64}{64}{64}{64}{64}{64}{64}{64}{64}{64}{69}{69}{69}{69}{69}{69}{69}{69}{63}{63}"
       ]
     }
   ],

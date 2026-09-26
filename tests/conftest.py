@@ -34,7 +34,6 @@ def base_config():
         "api_key": "sk-test",
         "api_base_url": "https://api.openai.com/v1",
         "model": "gpt-4o-mini",
-        "device_type": "flagship",
         "temperature": 1.2,
         "refresh_seconds": 300,
     }

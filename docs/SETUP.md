@@ -1,6 +1,6 @@
 # Generative AI Art Setup Guide
 
-Each refresh, the plugin asks an LLM to compose a full-screen abstract art piece for your split-flap display using the board's 8-colour palette. Every piece is unique — rotating through 30 built-in themes like aurora borealis, Mondrian-style blocks, mountain silhouettes, and more.
+Each refresh, the plugin asks an LLM to compose a full-screen abstract art piece for your split-flap display using the board's 8-colour palette. Every piece is unique — rotating through 63 built-in themes like aurora borealis, Mondrian-style blocks, mountain silhouettes, and more. The piece is composed for whatever board it lands on: there is no display-size setting to get wrong.
 
 ![Generative AI Art — Sunset](./board-display.png)
 
@@ -13,9 +13,26 @@ Each refresh, the plugin asks an LLM to compose a full-screen abstract art piece
 **What it does:**
 - Generates unique full-screen colour art on every refresh
 - Uses any OpenAI v1-compatible endpoint (OpenAI, Ollama, OpenRouter, LM Studio, etc.)
-- Supports both Flagship (6 × 22) and Note (3 × 15) display sizes
-- Falls back gracefully — if the LLM is unavailable the last piece stays on screen
-- 30 built-in artistic themes, or supply your own
+- Fills **any** board: Flagship (22 × 6), Note (15 × 3), or a note array /
+  FiestaPanel anywhere from 15 × 3 up to 120 × 24 — nothing to configure
+- Falls back gracefully — if the LLM is unavailable the last piece *for that
+  board* stays on screen
+- 63 built-in artistic themes, or supply your own
+
+### Board sizes
+
+The plugin reads the board it is rendering on and derives everything from it,
+so the same configuration serves a Note, a Flagship and a wall-sized panel at
+the same time.
+
+For small boards (up to 240 tiles — a Note, a Flagship, a 15 × 12 array) the
+model names one colour per tile. Above that, asking for 2,880 individual
+tiles would be a ~12,000-token reply that most models truncate, so the model
+instead returns a compact **scene description** — regions, gradients, shapes
+in normalised `0..1` coordinates — which the plugin rasterises to the board.
+That request costs the same whatever the board's size, and it composes for
+the board's real aspect ratio, so a wide-short 120 × 3 array and a
+tall-narrow 15 × 12 array each get art made for their shape.
 
 **Use Cases:**
 - Ambient art display that changes throughout the day
@@ -69,17 +86,16 @@ services:
 | `api_key` *(required)* | — | API key for your endpoint. |
 | `api_base_url` | `https://api.openai.com/v1` | Base URL for the chat completions endpoint. |
 | `model` | `gpt-4o-mini` | Model to use for art generation. |
-| `device_type` | `flagship` | `flagship` (6×22) or `note` (3×15). |
 | `temperature` | `1.2` | Sampling temperature (0–2). 1.0–1.4 gives varied, artistic results. |
 | `refresh_seconds` | `1800` | How often to generate a new piece (minimum 300 s / 5 min). |
-| `themes` | `[]` | Custom theme list. Empty = use the 30 built-in themes. |
+| `themes` | `[]` | Custom theme list. Empty = use the 63 built-in themes. |
 | `extra_instructions` | `""` | Additional instructions appended to the prompt (e.g. `"favour cool colours"`). |
 
 ## Template Variables
 
 | Variable | Description |
 |---|---|
-| `generative_ai_art.art` | Full-board colour pattern — use this in your page template |
+| `generative_ai_art.art` | Full-board colour pattern, sized to the board — use this in your page template |
 | `generative_ai_art.theme` | Theme of the current piece |
 | `generative_ai_art.description` | One-sentence artist's description |
 | `generative_ai_art.model` | Model that generated the piece |
@@ -87,17 +103,16 @@ services:
 
 ## Page Template
 
-The simplest page template uses the full board for art:
+The whole board is the art, so the template is a single variable on the first
+line with wrapping enabled — it fills row 1 and wraps down as far as the board
+goes:
 
 ```
 {{generative_ai_art.art}}
 ```
 
-You can combine art with text on unused rows (art fills row 1 and wraps down):
-
-```
-{{generative_ai_art.art}}
-```
+Turn on **Show Title** to spend the bottom row on a short centred label
+instead; the art then fills every row above it, on any board.
 
 ## Tips
 
