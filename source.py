@@ -198,6 +198,15 @@ class ArtValidationError(Exception):
 # ---------------------------------------------------------------------------
 
 
+class ArtRequestError(Exception):
+    """A request that never produced a reply worth parsing.
+
+    Raised by a ``complete`` callable handed to :class:`ArtGenerator` (the
+    plugin's bridge to FiestaBoard's AI providers). Treated exactly like a
+    transport failure: no retry with another theme.
+    """
+
+
 @dataclass(frozen=True)
 class Canvas:
     """The board being composed for. Every dimension in this module comes
@@ -721,6 +730,11 @@ class ArtGenerator:
         extra_instructions: Additional text appended to the system prompt.
         custom_system_prompt: Replaces the built-in system prompt entirely.
         show_title: Reserve the bottom board row for a title.
+        complete: Optional ``complete(messages, temperature=, max_tokens=)``
+                  returning the reply text. When given it replaces the HTTP
+                  call (``base_url`` and ``api_key`` are then unused); the
+                  plugin passes a bridge to FiestaBoard's AI providers. It
+                  raises :class:`ArtRequestError` when no reply came back.
     """
 
     def __init__(
@@ -733,18 +747,17 @@ class ArtGenerator:
         extra_instructions: str = "",
         custom_system_prompt: str = "",
         show_title: bool = False,
+        complete: Optional[Callable[..., str]] = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
-        #: HTTP status of the last failed request, or ``None``. Lets the
-        #: plugin tell a rejected sign-in (401) from any other failure.
-        self.last_status: Optional[int] = None
         self.model = model
         self.temperature = temperature
         self.themes = themes if themes else BUILTIN_THEMES
         self.extra_instructions = extra_instructions.strip()
         self.custom_system_prompt = custom_system_prompt.strip()
         self.show_title = show_title
+        self.complete = complete
 
     # ------------------------------------------------------------------
     # Public API
@@ -775,17 +788,15 @@ class ArtGenerator:
         """
         canvas = canvas or Canvas.default(show_title=self.show_title)
         theme = self._pick_theme()
-        self.last_status = None
 
         for attempt in range(MAX_ATTEMPTS):
             try:
                 parsed = self._validate_and_parse(self._call_api(theme, canvas), canvas)
-            except requests.RequestException as exc:
+            except (requests.RequestException, ArtRequestError) as exc:
                 # A transport failure will not be fixed by a different theme,
                 # and the caller has a per-geometry fallback piece for exactly
                 # this case.
                 logger.error("API request failed: %s", exc)
-                self.last_status = getattr(getattr(exc, "response", None), "status_code", None)
                 return None
             except ArtValidationError as exc:
                 logger.warning(
@@ -1002,6 +1013,12 @@ OUTPUT FORMAT (strict JSON, no other text):
 
     def _call_api(self, theme: str, canvas: Canvas) -> str:
         """POST to the chat completions endpoint and return the content string."""
+        if self.complete is not None:
+            return self.complete(
+                self._build_messages(theme, canvas),
+                temperature=self.temperature,
+                max_tokens=self.max_tokens_for(canvas),
+            )
         url = f"{self.base_url}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",

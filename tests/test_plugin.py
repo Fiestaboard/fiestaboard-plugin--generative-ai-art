@@ -681,12 +681,12 @@ class TestPluginValidateConfig:
     def test_valid_config_no_errors(self, base_config):
         assert self._plugin().validate_config(base_config) == []
 
-    def test_missing_api_key_is_allowed_for_sign_in(self, base_config):
-        """Sign in with OpenRouter replaces the key, so it is no longer required."""
+    def test_missing_api_key_is_allowed_for_ai_providers(self, base_config):
+        """FiestaBoard's AI providers replace the key, so it is no longer required."""
         base_config.pop("api_key")
         assert self._plugin().validate_config(base_config) == []
 
-    def test_empty_api_key_is_allowed_for_sign_in(self, base_config):
+    def test_empty_api_key_is_allowed_for_ai_providers(self, base_config):
         base_config["api_key"] = ""
         assert self._plugin().validate_config(base_config) == []
 
@@ -846,12 +846,16 @@ class TestPluginFetchData:
         mock_post.side_effect = req_module.RequestException("timeout")
         assert self._make_plugin(base_config, sample_manifest).fetch_data().available is False
 
-    def test_unavailable_when_no_api_key(self, sample_manifest):
+    def test_unavailable_when_no_api_key_and_no_ai_provider(self, sample_manifest):
+        from src.ai.plugin_api import AINotConfiguredError
+
         plugin = GenerativeAiArtPlugin(sample_manifest)
         plugin.config = {"api_key": ""}
+        plugin.ai_complete = MagicMock(side_effect=AINotConfiguredError("No AI provider is set up."))
         result = plugin.fetch_data()
         assert result.available is False
         assert "api key" in result.error.lower()
+        assert "AI Providers" in result.error
 
     @patch("plugins.generative_ai_art.source.requests.post")
     def test_config_change_resets_generator_and_history(

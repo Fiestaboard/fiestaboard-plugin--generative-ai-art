@@ -1,13 +1,13 @@
 # fiestaboard-plugin--generative-ai-art
 
-A [FiestaBoard](https://github.com/Fiestaboard/FiestaBoard) plugin that generates full-screen abstract art for your split-flap display using any OpenAI-compatible LLM.
+A [FiestaBoard](https://github.com/Fiestaboard/FiestaBoard) plugin that generates full-screen abstract art for your split-flap display. It uses your FiestaBoard AI provider: whatever you set up in **Settings → AI Providers** (an OpenAI-compatible, Anthropic or OpenAI Responses endpoint, a pasted key, or a sign-in with OpenRouter, Hugging Face or ChatGPT). There is no AI setup in the plugin itself.
 
 Each refresh the plugin asks the model to compose a unique colour-tile composition using the board's 8-colour palette, following a rotating set of 63 artistic themes (concentric rings, mountain silhouettes, aurora borealis, Mondrian-style blocks, and many more).
 
 ## Features
 
-- Works with any OpenAI v1-compatible endpoint — OpenAI, OpenRouter, Ollama, LM Studio, etc.
-- Or skip the key: **Sign in with OpenRouter** from the plugin settings (FiestaBoard 9.9.0+).
+- Uses your FiestaBoard AI provider (FiestaBoard 9.9.0+): FiestaBot's default, or the one you pick
+- Optional: a separate API key for any OpenAI v1-compatible endpoint (OpenAI, OpenRouter, Ollama, LM Studio, etc.)
 - Renders on **every board FiestaBoard supports**, with nothing to configure:
   - **Flagship** — 22 × 6
   - **Note** — 15 × 3
@@ -45,18 +45,31 @@ is repaired onto the board rather than thrown away.
 
 ## Configuration
 
+Set up a provider once in **Settings → AI Providers**, then enable the plugin. That is all it needs.
+
 | Setting | Type | Default | Description |
 |---|---|---|---|
-| `api_key` | string | — | API key. Use any value (e.g. `"ollama"`) for local endpoints that don't need auth. Required unless you sign in with OpenRouter; a saved key always wins. |
-| `api_base_url` | string | `https://api.openai.com/v1` | Base URL for the chat completions endpoint. |
-| `model` | string | `gpt-4o-mini` | Model name. |
+| `ai_provider` | string | `""` | Which FiestaBoard AI provider composes the art. Empty means FiestaBot's default provider. |
+| `ai_model` | string | `""` | Model for that provider. Empty means the provider's default model. |
+| `api_key` | string | — | **Use a separate API key (optional).** When set it always wins, and the plugin calls `api_base_url` with `model` directly instead of your AI providers. Use any value (e.g. `"ollama"`) for local endpoints that don't need auth. |
+| `api_base_url` | string | `https://api.openai.com/v1` | With a separate API key: base URL for the chat completions endpoint. |
+| `model` | string | `gpt-4o-mini` | With a separate API key: model name. |
 | `temperature` | number 0–2 | `1.2` | Sampling temperature. 1.0–1.4 works well for art. |
 | `refresh_seconds` | integer ≥300 | `1800` | How often to generate a new piece (minimum 5 minutes). |
 | `themes` | string[] | `[]` | Custom theme list. Leave empty to use the 63 built-in themes. |
 | `extra_instructions` | string | `""` | Extra instructions appended to the built-in system prompt (e.g. `"favour cool colours"`). Ignored when `custom_system_prompt` is set. |
 | `custom_system_prompt` | string | `""` | Override the entire system prompt sent to the LLM. Leave blank to use the built-in prompt. Call `generator.build_default_system_prompt(canvas)` to inspect the default for a given board. A custom prompt is used unchanged on every board, so write it board-agnostically. |
 
+If the board shows "Set up AI in Settings → AI Providers…", AI is turned off or no provider is set up.
+"Reconnect the AI provider…" means the provider refused its key or sign-in. On a FiestaBoard older
+than 9.9.0 the plugin asks you to "Update FiestaBoard to use its AI providers, or paste an API key";
+a separate API key keeps working there.
+
+Configs saved before this version keep their `api_key`, `api_base_url` and `model`, and keep using them.
+
 ### Environment-variable overrides
+
+These set the separate API key path.
 
 | Variable | Default |
 |---|---|
@@ -78,7 +91,12 @@ is repaired onto the board rather than thrown away.
 
 ## Installation
 
-### Quick start with Ollama
+### Recommended: your FiestaBoard AI provider
+
+1. Add a provider in **Settings → AI Providers** (or sign in with OpenRouter, Hugging Face or ChatGPT there).
+2. Enable **Generative AI Art**. Leave **AI Provider** empty for FiestaBot's default, or pick one.
+
+### Separate API key: Ollama
 
 ```yaml
 # docker-compose.override.yml
@@ -91,7 +109,7 @@ services:
       GENERATIVE_AI_ART_REFRESH_SECONDS: "900"
 ```
 
-### OpenAI
+### Separate API key: OpenAI
 
 ```yaml
 services:
@@ -101,7 +119,7 @@ services:
       GENERATIVE_AI_ART_MODEL: "gpt-4o-mini"
 ```
 
-### OpenRouter
+### Separate API key: OpenRouter
 
 ```yaml
 services:
@@ -111,14 +129,6 @@ services:
       GENERATIVE_AI_ART_API_BASE_URL: "https://openrouter.ai/api/v1"
       GENERATIVE_AI_ART_MODEL: "anthropic/claude-3-haiku"
 ```
-
-### Sign in with OpenRouter
-
-On FiestaBoard 9.9.0 or later you can leave **API Key** empty and press **Sign in with OpenRouter**
-in the plugin's **Account connection** section instead. OpenRouter issues a key that the board stores
-for you; it never appears in your settings. Requests then go to `https://openrouter.ai/api/v1`, and a
-bare OpenAI model name such as `gpt-4o-mini` is sent as `openai/gpt-4o-mini`. A saved API key always
-takes precedence. See [docs/SETUP.md](docs/SETUP.md#option-d-sign-in-with-openrouter-no-key-to-copy).
 
 ## Development
 

@@ -2,21 +2,13 @@
   "id": "generative_ai_art",
   "name": "Generative AI Art",
   "version": "1.5.0",
-  "description": "Generate full-screen abstract art for your split-flap display using an LLM. Each piece is a unique, thought-out composition using the board's 8-color palette, composed for whatever board it lands on — Flagship, Note, or a note array up to 120x24.",
+  "description": "Generate full-screen abstract art for your split-flap display using your FiestaBoard AI provider. Each piece is a unique, thought-out composition using the board's 8-color palette, composed for whatever board it lands on — Flagship, Note, or a note array up to 120x24.",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--generative-ai-art",
   "documentation": "README.md",
   "icon": "palette",
   "category": "art",
   "min_refresh_seconds": 300,
-  "oauth": {
-    "provider_name": "OpenRouter",
-    "flows": [
-      "key_exchange"
-    ],
-    "authorization_url": "https://openrouter.ai/auth",
-    "token_url": "https://openrouter.ai/api/v1/auth/keys"
-  },
   "settings_schema": {
     "type": "object",
     "properties": {
@@ -25,22 +17,41 @@
         "title": "Enable Generative AI Art",
         "default": false
       },
-      "api_base_url": {
+      "ai_provider": {
         "type": "string",
-        "title": "API Base URL",
-        "description": "Base URL for an OpenAI-compatible chat completions endpoint (e.g. https://api.openai.com/v1 or http://localhost:11434/v1 for Ollama). Used with the API key; a sign-in always goes to OpenRouter.",
-        "default": "https://api.openai.com/v1"
+        "title": "AI Provider",
+        "description": "Which of your FiestaBoard AI providers (Settings → AI Providers) composes the art. Leave empty for FiestaBot's default provider. Not used when a separate API key is set below.",
+        "default": "",
+        "ui:widget": "remote-options",
+        "ui:options": {
+          "options_id": "ai_providers",
+          "searchable": true,
+          "cache_seconds": 30,
+          "placeholder": "FiestaBot's default provider"
+        }
+      },
+      "ai_model": {
+        "type": "string",
+        "title": "AI Model",
+        "description": "Optional model for the AI provider above. Leave empty for the provider's default model.",
+        "default": ""
       },
       "api_key": {
         "type": "string",
-        "title": "API Key",
-        "description": "API key for the endpoint. Leave empty to use Sign in with OpenRouter instead; a saved key always wins. Use any value (e.g. 'ollama') for local endpoints that don't require auth.",
+        "title": "Use a separate API key (optional)",
+        "description": "Only if you want this plugin to skip your FiestaBoard AI providers. When set, it always wins and is sent to the Separate API Base URL with the Separate API Model below. Use any value (e.g. 'ollama') for local endpoints that don't require auth.",
         "secret": true
+      },
+      "api_base_url": {
+        "type": "string",
+        "title": "Separate API Base URL",
+        "description": "Used only with a separate API key: base URL for an OpenAI-compatible chat completions endpoint (e.g. https://api.openai.com/v1 or http://localhost:11434/v1 for Ollama).",
+        "default": "https://api.openai.com/v1"
       },
       "model": {
         "type": "string",
-        "title": "Model",
-        "description": "Model to use for art generation. With Sign in with OpenRouter, a bare OpenAI name such as gpt-4o-mini becomes openai/gpt-4o-mini; any OpenRouter slug (vendor/model) works.",
+        "title": "Separate API Model",
+        "description": "Used only with a separate API key: the model name at that endpoint.",
         "default": "gpt-4o-mini"
       },
       "temperature": {
@@ -99,7 +110,7 @@
     {
       "name": "GENERATIVE_AI_ART_API_KEY",
       "required": false,
-      "description": "API key for the OpenAI-compatible endpoint"
+      "description": "Optional separate API key for an OpenAI-compatible endpoint; when set it is used instead of your FiestaBoard AI providers"
     },
     {
       "name": "GENERATIVE_AI_ART_API_BASE_URL",
