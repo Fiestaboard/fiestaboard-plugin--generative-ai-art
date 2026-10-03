@@ -1,14 +1,22 @@
 {
   "id": "generative_ai_art",
   "name": "Generative AI Art",
-  "version": "1.4.3",
-  "description": "Generate full-screen abstract art for your split-flap display using an LLM. Each piece is a unique, thought-out composition using the board's 8-color palette, composed for whatever board it lands on — Flagship, Note, or a note array up to 120x24.",
+  "version": "1.5.0",
+  "description": "Generate full-screen abstract art for your split-flap display using an LLM. Each piece is a unique, thought-out composition using the board's 8-color palette, composed for whatever board it lands on \u2014 Flagship, Note, or a note array up to 120x24.",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--generative-ai-art",
   "documentation": "README.md",
   "icon": "palette",
   "category": "art",
   "min_refresh_seconds": 300,
+  "oauth": {
+    "provider_name": "OpenRouter",
+    "flows": [
+      "key_exchange"
+    ],
+    "authorization_url": "https://openrouter.ai/auth",
+    "token_url": "https://openrouter.ai/api/v1/auth/keys"
+  },
   "settings_schema": {
     "type": "object",
     "properties": {
@@ -20,25 +28,25 @@
       "api_base_url": {
         "type": "string",
         "title": "API Base URL",
-        "description": "Base URL for an OpenAI-compatible chat completions endpoint (e.g. https://api.openai.com/v1 or http://localhost:11434/v1 for Ollama)",
+        "description": "Base URL for an OpenAI-compatible chat completions endpoint (e.g. https://api.openai.com/v1 or http://localhost:11434/v1 for Ollama). Used with the API key; a sign-in always goes to OpenRouter.",
         "default": "https://api.openai.com/v1"
       },
       "api_key": {
         "type": "string",
         "title": "API Key",
-        "description": "API key for the endpoint. Use any value (e.g. 'ollama') for local endpoints that don't require auth.",
+        "description": "API key for the endpoint. Leave empty to use Sign in with OpenRouter instead; a saved key always wins. Use any value (e.g. 'ollama') for local endpoints that don't require auth.",
         "secret": true
       },
       "model": {
         "type": "string",
         "title": "Model",
-        "description": "Model to use for art generation",
+        "description": "Model to use for art generation. With Sign in with OpenRouter, a bare OpenAI name such as gpt-4o-mini becomes openai/gpt-4o-mini; any OpenRouter slug (vendor/model) works.",
         "default": "gpt-4o-mini"
       },
       "temperature": {
         "type": "number",
         "title": "Temperature",
-        "description": "LLM sampling temperature (0 = deterministic, 2 = very random). 1.0–1.4 works well for art.",
+        "description": "LLM sampling temperature (0 = deterministic, 2 = very random). 1.0\u20131.4 works well for art.",
         "default": 1.2,
         "minimum": 0,
         "maximum": 2
@@ -69,7 +77,7 @@
       "custom_system_prompt": {
         "type": "string",
         "title": "Custom System Prompt",
-        "description": "Override the full system prompt sent to the LLM. Leave blank to use the built-in prompt, which is written for the board being rendered. When set, Extra Prompt Instructions is ignored, and the same prompt is used on every board — so write it board-agnostically. Use the generator's build_default_system_prompt(canvas) method to see the default.",
+        "description": "Override the full system prompt sent to the LLM. Leave blank to use the built-in prompt, which is written for the board being rendered. When set, Extra Prompt Instructions is ignored, and the same prompt is used on every board \u2014 so write it board-agnostically. Use the generator's build_default_system_prompt(canvas) method to see the default.",
         "format": "textarea",
         "default": ""
       },
@@ -79,10 +87,7 @@
         "description": "Display a centered title on the bottom row of the board. When enabled, the art fills all rows except the last one.",
         "default": false
       }
-    },
-    "required": [
-      "api_key"
-    ]
+    }
   },
   "env_vars": [
     {
@@ -111,7 +116,7 @@
     {
       "name": "GENERATIVE_AI_ART_TEMPERATURE",
       "required": false,
-      "description": "Sampling temperature (0.0–2.0)",
+      "description": "Sampling temperature (0.0\u20132.0)",
       "default": "1.2"
     },
     {
@@ -174,7 +179,7 @@
       }
     }
   },
-  "fiestaboard_version": ">=2.10.0",
+  "fiestaboard_version": ">=9.9.0",
   "teaser": "{67}{68}{63}{64}{65}{66} AI ART",
   "previews": [
     {
@@ -197,7 +202,7 @@
       ]
     },
     {
-      "label": "Note Array 2×2 (panel)",
+      "label": "Note Array 2\u00d72 (panel)",
       "device_type": "note_array",
       "notes_wide": 2,
       "notes_tall": 2,
@@ -211,7 +216,7 @@
       ]
     },
     {
-      "label": "Note Array 4×1 (wide)",
+      "label": "Note Array 4\u00d71 (wide)",
       "device_type": "note_array",
       "notes_wide": 4,
       "notes_tall": 1,

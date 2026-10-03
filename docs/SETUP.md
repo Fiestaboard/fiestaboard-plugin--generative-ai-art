@@ -42,7 +42,7 @@ tall-narrow 15 × 12 array each get art made for their shape.
 ## Prerequisites
 
 - ✅ An OpenAI-compatible API endpoint
-- ✅ An API key (use any value, e.g. `"ollama"`, for local endpoints)
+- ✅ An API key (use any value, e.g. `"ollama"`, for local endpoints), **or** an OpenRouter account to sign in with (FiestaBoard 9.9.0+)
 
 ## Quick Setup
 
@@ -79,11 +79,29 @@ services:
       GENERATIVE_AI_ART_MODEL: "anthropic/claude-3-haiku"
 ```
 
+### Option D: Sign in with OpenRouter (no key to copy)
+
+Requires FiestaBoard 9.9.0 or later.
+
+1. Open **Settings → Integrations**, then this plugin's settings.
+2. Leave **API Key** empty. A saved key always wins over a sign-in.
+3. In **Account connection**, press **Sign in with OpenRouter** and approve on OpenRouter's page.
+   You return to the board, connected. If the browser does not come back, paste the address
+   it stopped at (or use **Sign in without a browser redirect** and paste the code OpenRouter shows)
+   into the box offered, and press **Finish sign-in**.
+4. Set **Model** to any OpenRouter slug, such as `anthropic/claude-3-haiku`. A bare OpenAI name like
+   the default `gpt-4o-mini` is sent as `openai/gpt-4o-mini`. **API Base URL** is not used: a sign-in
+   always goes to OpenRouter.
+
+The key OpenRouter issues does not expire. To stop using it, press **Disconnect** (and revoke it on
+OpenRouter's keys page if you like). If OpenRouter starts refusing it, the board shows
+"OpenRouter rejected the sign-in" and the settings ask you to sign in again.
+
 ## Configuration Reference
 
 | Setting | Default | Description |
 |---|---|---|
-| `api_key` *(required)* | — | API key for your endpoint. |
+| `api_key` | — | API key for your endpoint. Required unless you sign in with OpenRouter; when set, it is always used. |
 | `api_base_url` | `https://api.openai.com/v1` | Base URL for the chat completions endpoint. |
 | `model` | `gpt-4o-mini` | Model to use for art generation. |
 | `temperature` | `1.2` | Sampling temperature (0–2). 1.0–1.4 gives varied, artistic results. |

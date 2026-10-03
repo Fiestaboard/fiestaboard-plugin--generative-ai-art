@@ -736,6 +736,9 @@ class ArtGenerator:
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
+        #: HTTP status of the last failed request, or ``None``. Lets the
+        #: plugin tell a rejected sign-in (401) from any other failure.
+        self.last_status: Optional[int] = None
         self.model = model
         self.temperature = temperature
         self.themes = themes if themes else BUILTIN_THEMES
@@ -772,6 +775,7 @@ class ArtGenerator:
         """
         canvas = canvas or Canvas.default(show_title=self.show_title)
         theme = self._pick_theme()
+        self.last_status = None
 
         for attempt in range(MAX_ATTEMPTS):
             try:
@@ -781,6 +785,7 @@ class ArtGenerator:
                 # and the caller has a per-geometry fallback piece for exactly
                 # this case.
                 logger.error("API request failed: %s", exc)
+                self.last_status = getattr(getattr(exc, "response", None), "status_code", None)
                 return None
             except ArtValidationError as exc:
                 logger.warning(

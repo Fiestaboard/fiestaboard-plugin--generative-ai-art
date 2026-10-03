@@ -7,6 +7,7 @@ Each refresh the plugin asks the model to compose a unique colour-tile compositi
 ## Features
 
 - Works with any OpenAI v1-compatible endpoint — OpenAI, OpenRouter, Ollama, LM Studio, etc.
+- Or skip the key: **Sign in with OpenRouter** from the plugin settings (FiestaBoard 9.9.0+).
 - Renders on **every board FiestaBoard supports**, with nothing to configure:
   - **Flagship** — 22 × 6
   - **Note** — 15 × 3
@@ -46,7 +47,7 @@ is repaired onto the board rather than thrown away.
 
 | Setting | Type | Default | Description |
 |---|---|---|---|
-| `api_key` *(required)* | string | — | API key. Use any value (e.g. `"ollama"`) for local endpoints that don't need auth. |
+| `api_key` | string | — | API key. Use any value (e.g. `"ollama"`) for local endpoints that don't need auth. Required unless you sign in with OpenRouter; a saved key always wins. |
 | `api_base_url` | string | `https://api.openai.com/v1` | Base URL for the chat completions endpoint. |
 | `model` | string | `gpt-4o-mini` | Model name. |
 | `temperature` | number 0–2 | `1.2` | Sampling temperature. 1.0–1.4 works well for art. |
@@ -110,6 +111,14 @@ services:
       GENERATIVE_AI_ART_API_BASE_URL: "https://openrouter.ai/api/v1"
       GENERATIVE_AI_ART_MODEL: "anthropic/claude-3-haiku"
 ```
+
+### Sign in with OpenRouter
+
+On FiestaBoard 9.9.0 or later you can leave **API Key** empty and press **Sign in with OpenRouter**
+in the plugin's **Account connection** section instead. OpenRouter issues a key that the board stores
+for you; it never appears in your settings. Requests then go to `https://openrouter.ai/api/v1`, and a
+bare OpenAI model name such as `gpt-4o-mini` is sent as `openai/gpt-4o-mini`. A saved API key always
+takes precedence. See [docs/SETUP.md](docs/SETUP.md#option-d-sign-in-with-openrouter-no-key-to-copy).
 
 ## Development
 

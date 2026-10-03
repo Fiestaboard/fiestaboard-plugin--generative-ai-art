@@ -13,11 +13,19 @@ every board the user owns —
 - Note array / FiestaPanel, anything from 15 × 3 to 120 × 24
 
 Works with any OpenAI v1-compatible endpoint (OpenAI, OpenRouter, Ollama, …).
+
+Two ways to connect (FiestaBoard 9.9.0+ for the second):
+
+- **API key** (``api_key`` + ``api_base_url``): unchanged, and always used
+  when a key is saved.
+- **Sign in with OpenRouter**: the manifest's ``key_exchange`` OAuth block.
+  The platform stores the key OpenRouter issues; this plugin reads it with
+  ``get_oauth_token()`` on every fetch and sends it to OpenRouter.
 """
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.plugins.base import PluginBase, PluginResult
 
@@ -36,6 +44,14 @@ logger = logging.getLogger(__name__)
 #: cache entry per geometry it has ever seen.
 MAX_REMEMBERED_PIECES = 16
 
+#: Where a key from "Sign in with OpenRouter" is sent.
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+DEFAULT_BASE_URL = "https://api.openai.com/v1"
+DEFAULT_MODEL = "gpt-4o-mini"
+
+NOT_CONNECTED = "Not connected: paste an API key or sign in with OpenRouter in this plugin's settings"
+SIGN_IN_REJECTED = "OpenRouter rejected the sign-in. Sign in again in this plugin's settings."
+
 
 class GenerativeAiArtPlugin(PluginBase):
     """Generative AI Art plugin.
@@ -53,6 +69,7 @@ class GenerativeAiArtPlugin(PluginBase):
         # The generator holds no geometry — the canvas is passed per call —
         # so a single instance is safe to share across every board.
         self._generator: Optional[ArtGenerator] = None
+        self._generator_key: Optional[Tuple[str, str, str]] = None
         # Fallback pieces keyed by canvas geometry. Keying matters: without
         # it an outage on one board serves another board's frame, which is
         # either an overflow or a mostly-blank panel.
@@ -76,8 +93,9 @@ class GenerativeAiArtPlugin(PluginBase):
         """
         errors: List[str] = []
 
-        if not config.get("api_key"):
-            errors.append("API key is required")
+        # No API key is not an error: "Sign in with OpenRouter" replaces it,
+        # and the sign-in happens after the settings are saved.  fetch_data
+        # reports a board with neither.
 
         base_url = config.get("api_base_url", "")
         if base_url and not (
@@ -109,16 +127,27 @@ class GenerativeAiArtPlugin(PluginBase):
         cfg = self.config
         canvas = self.canvas()
 
-        if not cfg.get("api_key"):
-            return PluginResult(available=False, error="API key not configured")
+        credentials = self._credentials()
+        if credentials is None:
+            return PluginResult(available=False, error=NOT_CONNECTED)
+        base_url, api_key, model, signed_in = credentials
 
-        generator = self._get_generator()
-        if generator is None:
-            return PluginResult(
-                available=False, error="Art generator could not be initialised"
-            )
-
+        generator = self._get_generator(base_url, api_key, model)
         piece = generator.generate(canvas)
+
+        if piece is None and signed_in and generator.last_status == 401:
+            # Only a signed-in key is reported: a pasted key is the user's
+            # own to fix.  The platform may hand back a replacement once.
+            report = getattr(self, "report_oauth_rejected", None)
+            try:
+                new_key = report() if callable(report) else None
+            except Exception:  # noqa: BLE001 — never let the hook break a render
+                logger.exception("report_oauth_rejected failed")
+                new_key = None
+            if not new_key:
+                return PluginResult(available=False, error=SIGN_IN_REJECTED)
+            generator = self._get_generator(base_url, new_key, model)
+            piece = generator.generate(canvas)
 
         if piece is None:
             logger.warning(
@@ -180,21 +209,47 @@ class GenerativeAiArtPlugin(PluginBase):
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _get_generator(self) -> Optional[ArtGenerator]:
-        """Return (or lazily create) the ArtGenerator for the current config."""
-        if self._generator is not None:
+    def _credentials(self) -> Optional[Tuple[str, str, str, bool]]:
+        """``(base_url, api_key, model, signed_in)``, or ``None`` when not connected.
+
+        A saved API key always wins and is used exactly as before.  Otherwise
+        the key from "Sign in with OpenRouter" is read fresh on every fetch.
+        """
+        cfg = self.config
+        model = cfg.get("model") or DEFAULT_MODEL
+        api_key = cfg.get("api_key", "")
+        if api_key:
+            return cfg.get("api_base_url", DEFAULT_BASE_URL), api_key, model, False
+
+        get_token = getattr(self, "get_oauth_token", None)  # absent before 9.5.0
+        if not callable(get_token):
+            return None
+        try:
+            token = get_token()
+        except Exception:  # noqa: BLE001 — fetch_data must never raise
+            logger.exception("Could not read the OpenRouter sign-in")
+            return None
+        if not token:
+            return None
+        # OpenRouter names models "vendor/model"; the default "gpt-4o-mini"
+        # (and any other bare OpenAI name) is OpenAI's.
+        if "/" not in model:
+            model = f"openai/{model}"
+        return OPENROUTER_BASE_URL, token, model, True
+
+    def _get_generator(self, base_url: str, api_key: str, model: str) -> ArtGenerator:
+        """Return the ArtGenerator for these credentials, rebuilt when they change."""
+        key = (base_url, api_key, model)
+        if self._generator is not None and self._generator_key == key:
             return self._generator
 
         cfg = self.config
-        api_key = cfg.get("api_key", "")
-        if not api_key:
-            return None
-
         themes = cfg.get("themes") or []
+        self._generator_key = key
         self._generator = ArtGenerator(
-            base_url=cfg.get("api_base_url", "https://api.openai.com/v1"),
+            base_url=base_url,
             api_key=api_key,
-            model=cfg.get("model", "gpt-4o-mini"),
+            model=model,
             temperature=float(cfg.get("temperature", 1.2)),
             themes=themes if isinstance(themes, list) else [],
             extra_instructions=cfg.get("extra_instructions", ""),

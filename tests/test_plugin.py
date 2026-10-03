@@ -681,13 +681,14 @@ class TestPluginValidateConfig:
     def test_valid_config_no_errors(self, base_config):
         assert self._plugin().validate_config(base_config) == []
 
-    def test_missing_api_key(self, base_config):
+    def test_missing_api_key_is_allowed_for_sign_in(self, base_config):
+        """Sign in with OpenRouter replaces the key, so it is no longer required."""
         base_config.pop("api_key")
-        assert any("api key" in e.lower() for e in self._plugin().validate_config(base_config))
+        assert self._plugin().validate_config(base_config) == []
 
-    def test_empty_api_key(self, base_config):
+    def test_empty_api_key_is_allowed_for_sign_in(self, base_config):
         base_config["api_key"] = ""
-        assert any("api key" in e.lower() for e in self._plugin().validate_config(base_config))
+        assert self._plugin().validate_config(base_config) == []
 
     def test_legacy_device_type_is_ignored_not_rejected(self, base_config):
         """An existing user's config must keep working after the setting is gone."""
