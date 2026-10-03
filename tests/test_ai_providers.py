@@ -272,3 +272,90 @@ def test_blank_provider_means_default(value):
     _plugin({"ai_provider": value, "ai_model": value}, complete).fetch_data()
     assert complete.call_args.kwargs["provider_id"] is None
     assert complete.call_args.kwargs["model"] is None
+
+
+# ── through core's real ai_complete (no mock of the plugin API) ─────────────
+
+PROVIDER = {"id": "p1", "name": "Test", "protocol": "openai", "base_url": "https://example.test/v1",
+            "api_key": "k", "default_model": "core-model"}
+
+
+def _core_plugin(config, block):
+    """A plugin whose ai_complete is core's own, with settings and HTTP stubbed."""
+    plugin = _plugin(config)
+    patches = [patch("src.ai.plugin_api._providers_block", return_value=block)]
+    return plugin, patches
+
+
+def _run(plugin, patches, reply=None):
+    from contextlib import ExitStack
+
+    async def post(provider, payload, **kwargs):
+        post.calls.append((provider, payload))
+        return {"choices": [{"message": {"content": reply or json.dumps(GRID)}}]}
+
+    post.calls = []
+    with ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
+        stack.enter_context(patch("src.ai.plugin_api._post_chat_completion", post))
+        http = stack.enter_context(patch("plugins.generative_ai_art.source.requests.post"))
+        result = plugin.fetch_data()
+    return result, post.calls, http
+
+
+@pytest.mark.parametrize(
+    "block, reason",
+    [
+        ({"enabled": False, "providers": [PROVIDER]}, "not enabled"),
+        ({"enabled": True, "providers": []}, "No AI providers"),
+        ({}, "not enabled"),
+    ],
+)
+def test_core_ai_disabled_or_missing_provider_is_unavailable(block, reason):
+    plugin, patches = _core_plugin({}, block)
+    result, calls, http = _run(plugin, patches)
+    assert result.available is False
+    assert "Settings → AI Providers" in result.error
+    assert reason in result.error
+    assert calls == []
+    http.assert_not_called()
+
+
+def test_core_picked_provider_that_was_deleted_is_unavailable():
+    plugin, patches = _core_plugin({"ai_provider": "gone"}, {"enabled": True, "providers": [PROVIDER]})
+    result, calls, _ = _run(plugin, patches)
+    assert result.available is False
+    assert "'gone' not found" in result.error
+    assert calls == []
+
+
+def test_core_provider_path_end_to_end():
+    plugin, patches = _core_plugin({"temperature": 0.9}, {"enabled": True, "providers": [PROVIDER]})
+    result, calls, http = _run(plugin, patches)
+    assert result.available is True
+    assert len(result.formatted_lines) == 6
+    assert result.data["model"] == "core-model"
+    http.assert_not_called()
+    (provider, payload), = calls
+    assert provider["id"] == "p1"
+    assert payload["model"] == "core-model"
+    assert payload["temperature"] == 0.9
+    assert payload["messages"][0]["role"] == "system"
+
+
+def test_core_saved_key_never_touches_the_providers():
+    plugin, patches = _core_plugin({"api_key": "sk-test"}, {"enabled": True, "providers": [PROVIDER]})
+    from contextlib import ExitStack
+
+    with ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
+        complete = stack.enter_context(patch("src.ai.plugin_api.complete"))
+        post = stack.enter_context(
+            patch("plugins.generative_ai_art.source.requests.post", return_value=_ok())
+        )
+        result = plugin.fetch_data()
+    assert result.available is True
+    complete.assert_not_called()
+    assert post.call_args.args[0] == "https://api.openai.com/v1/chat/completions"
