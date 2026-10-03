@@ -53,7 +53,7 @@ def test_no_plugin_level_oauth_sign_in():
 
 
 def test_manifest_requires_a_core_with_ai_complete():
-    assert MANIFEST["fiestaboard_version"] == ">=9.9.0"
+    assert MANIFEST["fiestaboard_version"] == ">=9.11.0"
 
 
 def test_provider_picker_uses_the_core_ai_providers_source():
@@ -137,7 +137,7 @@ def test_pasted_openrouter_key_keeps_the_model_name_as_typed():
 
 def test_api_key_works_on_an_older_core_without_ai_complete():
     plugin = _plugin({"api_key": "sk-test"})
-    plugin.ai_complete = None  # what getattr sees on a core before 9.9.0
+    plugin.ai_complete = None  # what getattr sees on a core before 9.11.0
     with patch("plugins.generative_ai_art.source.requests.post", return_value=_ok()):
         assert plugin.fetch_data().available is True
 

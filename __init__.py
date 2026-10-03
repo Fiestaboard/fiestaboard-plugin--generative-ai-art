@@ -14,7 +14,7 @@ every board the user owns —
 
 How it reaches a model:
 
-- **FiestaBoard's AI providers** (the default, FiestaBoard 9.9.0+): the
+- **FiestaBoard's AI providers** (the default, FiestaBoard 9.11.0+): the
   provider picked in ``ai_provider`` (blank = FiestaBot's default) through
   ``self.ai_complete``, so every provider and sign-in set up in Settings →
   AI Providers works and the plugin carries no AI setup of its own.
@@ -57,7 +57,7 @@ REJECTED = "Reconnect the AI provider in Settings → AI Providers. ({})"
 
 
 def _ai_error_classes() -> Tuple[type, ...]:
-    """``(AINotConfiguredError, AIRejectedError)``, or empty on a core before 9.9.0."""
+    """``(AINotConfiguredError, AIRejectedError)``, or empty on a core before 9.11.0."""
     try:
         from src.plugins.base import AINotConfiguredError, AIRejectedError
     except ImportError:
@@ -150,7 +150,7 @@ class GenerativeAiArtPlugin(PluginBase):
                 ("key", cfg.get("api_base_url", DEFAULT_BASE_URL), api_key, model)
             )
         else:
-            if not callable(getattr(self, "ai_complete", None)):  # core before 9.9.0
+            if not callable(getattr(self, "ai_complete", None)):  # core before 9.11.0
                 return PluginResult(available=False, error=NEEDS_NEWER_CORE)
             generator = self._get_generator(("ai",))
 

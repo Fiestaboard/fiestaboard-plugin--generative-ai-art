@@ -6,7 +6,7 @@ Each refresh the plugin asks the model to compose a unique colour-tile compositi
 
 ## Features
 
-- Uses your FiestaBoard AI provider (FiestaBoard 9.9.0+): FiestaBot's default, or the one you pick
+- Uses your FiestaBoard AI provider (FiestaBoard 9.11.0+): FiestaBot's default, or the one you pick
 - Optional: a separate API key for any OpenAI v1-compatible endpoint (OpenAI, OpenRouter, Ollama, LM Studio, etc.)
 - Renders on **every board FiestaBoard supports**, with nothing to configure:
   - **Flagship** — 22 × 6
@@ -62,7 +62,7 @@ Set up a provider once in **Settings → AI Providers**, then enable the plugin.
 
 If the board shows "Set up AI in Settings → AI Providers…", AI is turned off or no provider is set up.
 "Reconnect the AI provider…" means the provider refused its key or sign-in. On a FiestaBoard older
-than 9.9.0 the plugin asks you to "Update FiestaBoard to use its AI providers, or paste an API key";
+than 9.11.0 the plugin asks you to "Update FiestaBoard to use its AI providers, or paste an API key";
 a separate API key keeps working there.
 
 Configs saved before this version keep their `api_key`, `api_base_url` and `model`, and keep using them.

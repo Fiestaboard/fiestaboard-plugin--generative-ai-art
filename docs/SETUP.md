@@ -44,7 +44,7 @@ tall-narrow 15 × 12 array each get art made for their shape.
 
 ## Prerequisites
 
-- ✅ FiestaBoard 9.9.0 or later
+- ✅ FiestaBoard 9.11.0 or later
 - ✅ An AI provider in **Settings → AI Providers**, **or** a separate API key for an OpenAI-compatible endpoint
 
 ## Quick Setup
@@ -60,7 +60,7 @@ What the board tells you:
 
 - "Set up AI in Settings → AI Providers…": AI is turned off, no provider is set up, or the picked provider was deleted.
 - "Reconnect the AI provider in Settings → AI Providers…": the provider refused its key or sign-in.
-- "Update FiestaBoard to use its AI providers, or paste an API key…": this FiestaBoard is older than 9.9.0.
+- "Update FiestaBoard to use its AI providers, or paste an API key…": this FiestaBoard is older than 9.11.0.
 
 ### Separate API key
 
