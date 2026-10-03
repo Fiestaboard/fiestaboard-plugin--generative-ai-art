@@ -2,7 +2,7 @@
   "id": "generative_ai_art",
   "name": "Generative AI Art",
   "version": "1.5.0",
-  "description": "Generate full-screen abstract art for your split-flap display using an LLM. Each piece is a unique, thought-out composition using the board's 8-color palette, composed for whatever board it lands on \u2014 Flagship, Note, or a note array up to 120x24.",
+  "description": "Generate full-screen abstract art for your split-flap display using an LLM. Each piece is a unique, thought-out composition using the board's 8-color palette, composed for whatever board it lands on — Flagship, Note, or a note array up to 120x24.",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--generative-ai-art",
   "documentation": "README.md",
@@ -46,7 +46,7 @@
       "temperature": {
         "type": "number",
         "title": "Temperature",
-        "description": "LLM sampling temperature (0 = deterministic, 2 = very random). 1.0\u20131.4 works well for art.",
+        "description": "LLM sampling temperature (0 = deterministic, 2 = very random). 1.0–1.4 works well for art.",
         "default": 1.2,
         "minimum": 0,
         "maximum": 2
@@ -77,7 +77,7 @@
       "custom_system_prompt": {
         "type": "string",
         "title": "Custom System Prompt",
-        "description": "Override the full system prompt sent to the LLM. Leave blank to use the built-in prompt, which is written for the board being rendered. When set, Extra Prompt Instructions is ignored, and the same prompt is used on every board \u2014 so write it board-agnostically. Use the generator's build_default_system_prompt(canvas) method to see the default.",
+        "description": "Override the full system prompt sent to the LLM. Leave blank to use the built-in prompt, which is written for the board being rendered. When set, Extra Prompt Instructions is ignored, and the same prompt is used on every board — so write it board-agnostically. Use the generator's build_default_system_prompt(canvas) method to see the default.",
         "format": "textarea",
         "default": ""
       },
@@ -116,7 +116,7 @@
     {
       "name": "GENERATIVE_AI_ART_TEMPERATURE",
       "required": false,
-      "description": "Sampling temperature (0.0\u20132.0)",
+      "description": "Sampling temperature (0.0–2.0)",
       "default": "1.2"
     },
     {
@@ -202,7 +202,7 @@
       ]
     },
     {
-      "label": "Note Array 2\u00d72 (panel)",
+      "label": "Note Array 2×2 (panel)",
       "device_type": "note_array",
       "notes_wide": 2,
       "notes_tall": 2,
@@ -216,7 +216,7 @@
       ]
     },
     {
-      "label": "Note Array 4\u00d71 (wide)",
+      "label": "Note Array 4×1 (wide)",
       "device_type": "note_array",
       "notes_wide": 4,
       "notes_tall": 1,

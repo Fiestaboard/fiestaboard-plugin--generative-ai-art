@@ -80,6 +80,27 @@ def test_pasted_api_key_wins_and_is_sent_unchanged():
     assert post.call_args.kwargs["json"]["model"] == "llama3"
 
 
+def test_existing_key_only_config_uses_the_old_defaults():
+    """A pre-1.5.0 config with just a key still goes to OpenAI with gpt-4o-mini."""
+    plugin = _plugin({"api_key": "sk-test"}, token="test_openrouter_key")
+    with patch("plugins.generative_ai_art.source.requests.post", return_value=_ok()) as post:
+        assert plugin.fetch_data().available is True
+    assert post.call_args.args[0] == "https://api.openai.com/v1/chat/completions"
+    assert post.call_args.kwargs["headers"]["Authorization"] == "Bearer sk-test"
+    assert post.call_args.kwargs["json"]["model"] == "gpt-4o-mini"
+
+
+def test_pasted_key_on_openrouter_keeps_the_model_name_as_typed():
+    """The openai/ prefix is for sign-in only; a pasted OpenRouter key is untouched."""
+    plugin = _plugin(
+        {"api_key": "sk-or-test", "api_base_url": OPENROUTER_BASE_URL, "model": "gpt-4o-mini"},
+    )
+    with patch("plugins.generative_ai_art.source.requests.post", return_value=_ok()) as post:
+        plugin.fetch_data()
+    assert post.call_args.kwargs["json"]["model"] == "gpt-4o-mini"
+    plugin.report_oauth_rejected.assert_not_called()
+
+
 def test_signed_in_key_goes_to_openrouter():
     plugin = _plugin({"model": "gpt-4o-mini"}, token="test_openrouter_key")
     with patch("plugins.generative_ai_art.source.requests.post", return_value=_ok()) as post:
