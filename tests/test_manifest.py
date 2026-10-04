@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 import pytest
-from src.devices import MAX_NOTES_PER_AXIS, NOTE_COLS, NOTE_ROWS
+from src.devices import MAX_GRID_COLS, MAX_GRID_ROWS
 from src.plugins.previews import validate_previews
 from src.text_to_board import count_tiles
 
@@ -26,9 +26,10 @@ _MANIFEST_PATH = Path(__file__).resolve().parent.parent / "manifest.json"
 MANIFEST = json.loads(_MANIFEST_PATH.read_text())
 SIMPLE = MANIFEST["variables"]["simple"]
 
-#: The largest board FiestaBoard supports: an 8x8 note array.
-MAX_BOARD_COLS = MAX_NOTES_PER_AXIS * NOTE_COLS
-MAX_BOARD_ROWS = MAX_NOTES_PER_AXIS * NOTE_ROWS
+#: The largest board FiestaBoard supports: a FiestaPanel at core's grid
+#: ceiling (128 cols x 96 rows), which is bigger than an 8x8 note array.
+MAX_BOARD_COLS = MAX_GRID_COLS
+MAX_BOARD_ROWS = MAX_GRID_ROWS
 
 
 def test_art_max_length_matches_the_largest_board():

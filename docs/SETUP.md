@@ -1,6 +1,8 @@
 # Generative AI Art Setup Guide
 
-Each refresh, the plugin asks an LLM to compose a full-screen abstract art piece for your split-flap display using the board's 8-colour palette. Every piece is unique — rotating through 63 built-in themes like aurora borealis, Mondrian-style blocks, mountain silhouettes, and more. The piece is composed for whatever board it lands on: there is no display-size setting to get wrong.
+Generative AI Art uses your FiestaBoard AI provider: the one set up in **Settings → AI Providers**, the same one FiestaBot uses. There is no key, endpoint or sign-in to set up in the plugin.
+
+Each refresh, the plugin asks the model to compose a full-screen abstract art piece for your split-flap display using the board's 8-colour palette. Every piece is unique — rotating through 63 built-in themes like aurora borealis, Mondrian-style blocks, mountain silhouettes, and more. The piece is composed for whatever board it lands on: there is no display-size setting to get wrong.
 
 ![Generative AI Art — Sunset](./board-display.png)
 
@@ -12,9 +14,10 @@ Each refresh, the plugin asks an LLM to compose a full-screen abstract art piece
 
 **What it does:**
 - Generates unique full-screen colour art on every refresh
-- Uses any OpenAI v1-compatible endpoint (OpenAI, Ollama, OpenRouter, LM Studio, etc.)
-- Fills **any** board: Flagship (22 × 6), Note (15 × 3), or a note array /
-  FiestaPanel anywhere from 15 × 3 up to 120 × 24 — nothing to configure
+- Uses your FiestaBoard AI provider: any protocol (OpenAI-compatible, Anthropic, OpenAI Responses) and any connection (pasted key, or a sign-in with OpenRouter, Hugging Face or ChatGPT)
+- Optionally uses a separate API key for any OpenAI v1-compatible endpoint instead
+- Fills **any** board: Flagship (22 × 6), Note (15 × 3), a note array up to
+  120 × 24, or a FiestaPanel up to 128 × 96 — nothing to configure
 - Falls back gracefully — if the LLM is unavailable the last piece *for that
   board* stays on screen
 - 63 built-in artistic themes, or supply your own
@@ -41,12 +44,29 @@ tall-narrow 15 × 12 array each get art made for their shape.
 
 ## Prerequisites
 
-- ✅ An OpenAI-compatible API endpoint
-- ✅ An API key (use any value, e.g. `"ollama"`, for local endpoints)
+- ✅ FiestaBoard 9.11.0 or later
+- ✅ An AI provider in **Settings → AI Providers**, **or** a separate API key for an OpenAI-compatible endpoint
 
 ## Quick Setup
 
-### Option A: OpenAI
+### Recommended: your FiestaBoard AI provider
+
+1. Open **Settings → AI Providers** and add a provider, or sign in with OpenRouter, Hugging Face or ChatGPT. Make sure AI is turned on.
+2. Open **Settings → Integrations**, then **Generative AI Art**, and enable it.
+3. Leave **AI Provider** empty to use FiestaBot's default provider, or pick one. Leave **AI Model** empty for that provider's default model, or type one.
+4. Leave **Use a separate API key** empty.
+
+What the board tells you:
+
+- "Set up AI in Settings → AI Providers…": AI is turned off, no provider is set up, or the picked provider was deleted.
+- "Reconnect the AI provider in Settings → AI Providers…": the provider refused its key or sign-in.
+- "Update FiestaBoard to use its AI providers, or paste an API key…": this FiestaBoard is older than 9.11.0.
+
+### Separate API key
+
+Paste a key in **Use a separate API key** only if you want this plugin to skip your AI providers. A saved key always wins: the plugin then calls **Separate API Base URL** with **Separate API Model** directly, exactly as earlier versions did. Configs saved before this version keep working unchanged. The same settings can come from environment variables:
+
+#### Option A: OpenAI
 
 ```yaml
 # docker-compose.override.yml
@@ -57,7 +77,7 @@ services:
       GENERATIVE_AI_ART_MODEL: "gpt-4o-mini"
 ```
 
-### Option B: Ollama (local, free)
+#### Option B: Ollama (local, free)
 
 ```yaml
 services:
@@ -68,7 +88,7 @@ services:
       GENERATIVE_AI_ART_MODEL: "llama3.2"
 ```
 
-### Option C: OpenRouter
+#### Option C: OpenRouter
 
 ```yaml
 services:
@@ -83,9 +103,11 @@ services:
 
 | Setting | Default | Description |
 |---|---|---|
-| `api_key` *(required)* | — | API key for your endpoint. |
-| `api_base_url` | `https://api.openai.com/v1` | Base URL for the chat completions endpoint. |
-| `model` | `gpt-4o-mini` | Model to use for art generation. |
+| `ai_provider` | `""` | FiestaBoard AI provider to use. Empty = FiestaBot's default provider. |
+| `ai_model` | `""` | Model for that provider. Empty = the provider's default model. |
+| `api_key` | — | Optional separate API key. When set it always wins over the AI provider. |
+| `api_base_url` | `https://api.openai.com/v1` | With a separate API key: base URL for the chat completions endpoint. |
+| `model` | `gpt-4o-mini` | With a separate API key: model to use. |
 | `temperature` | `1.2` | Sampling temperature (0–2). 1.0–1.4 gives varied, artistic results. |
 | `refresh_seconds` | `1800` | How often to generate a new piece (minimum 300 s / 5 min). |
 | `themes` | `[]` | Custom theme list. Empty = use the 63 built-in themes. |
@@ -119,4 +141,4 @@ instead; the art then fills every row above it, on any board.
 - **Temperature 1.0–1.4** gives the best balance of creativity and structure. Higher values produce more chaotic results.
 - **Shorter refresh intervals** (e.g. 300 s) work well with fast local models; longer intervals (e.g. 3600 s) are better for rate-limited API endpoints.
 - Use **`extra_instructions`** to steer the palette — e.g. `"use only warm colours"` or `"favour dark, moody compositions"`.
-- Any OpenAI-compatible local model works; smaller models (7B–13B parameters) produce surprisingly good results.
+- A local model works too: add it as an AI provider (or use a separate API key); smaller models (7B–13B parameters) produce surprisingly good results.

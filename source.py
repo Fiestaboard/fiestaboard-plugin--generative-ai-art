@@ -1,9 +1,10 @@
 """Art generation logic for the Generative AI Art FiestaBoard plugin.
 
 The plugin renders onto whatever board it is bound to: a Flagship (22x6), a
-Note (15x3), or a note array anywhere from 15x3 to 120x24 (which is what a
-FiestaPanel is). Nothing here owns a list of board sizes; every dimension
-arrives as a :class:`Canvas` built from ``self.board`` by the plugin.
+Note (15x3), a note array anywhere from 15x3 to 120x24, or a FiestaPanel
+of any per-character grid up to 128x96. Nothing here owns a list of board
+sizes; every dimension arrives as a :class:`Canvas` built from
+``self.board`` by the plugin.
 
 Two emission strategies, chosen from the cell count alone:
 
@@ -196,6 +197,15 @@ class ArtValidationError(Exception):
 # ---------------------------------------------------------------------------
 # Canvas
 # ---------------------------------------------------------------------------
+
+
+class ArtRequestError(Exception):
+    """A request that never produced a reply worth parsing.
+
+    Raised by a ``complete`` callable handed to :class:`ArtGenerator` (the
+    plugin's bridge to FiestaBoard's AI providers). Treated exactly like a
+    transport failure: no retry with another theme.
+    """
 
 
 @dataclass(frozen=True)
@@ -721,6 +731,11 @@ class ArtGenerator:
         extra_instructions: Additional text appended to the system prompt.
         custom_system_prompt: Replaces the built-in system prompt entirely.
         show_title: Reserve the bottom board row for a title.
+        complete: Optional ``complete(messages, temperature=, max_tokens=)``
+                  returning the reply text. When given it replaces the HTTP
+                  call (``base_url`` and ``api_key`` are then unused); the
+                  plugin passes a bridge to FiestaBoard's AI providers. It
+                  raises :class:`ArtRequestError` when no reply came back.
     """
 
     def __init__(
@@ -733,6 +748,7 @@ class ArtGenerator:
         extra_instructions: str = "",
         custom_system_prompt: str = "",
         show_title: bool = False,
+        complete: Optional[Callable[..., str]] = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -742,6 +758,7 @@ class ArtGenerator:
         self.extra_instructions = extra_instructions.strip()
         self.custom_system_prompt = custom_system_prompt.strip()
         self.show_title = show_title
+        self.complete = complete
 
     # ------------------------------------------------------------------
     # Public API
@@ -776,7 +793,7 @@ class ArtGenerator:
         for attempt in range(MAX_ATTEMPTS):
             try:
                 parsed = self._validate_and_parse(self._call_api(theme, canvas), canvas)
-            except requests.RequestException as exc:
+            except (requests.RequestException, ArtRequestError) as exc:
                 # A transport failure will not be fixed by a different theme,
                 # and the caller has a per-geometry fallback piece for exactly
                 # this case.
@@ -997,6 +1014,12 @@ OUTPUT FORMAT (strict JSON, no other text):
 
     def _call_api(self, theme: str, canvas: Canvas) -> str:
         """POST to the chat completions endpoint and return the content string."""
+        if self.complete is not None:
+            return self.complete(
+                self._build_messages(theme, canvas),
+                temperature=self.temperature,
+                max_tokens=self.max_tokens_for(canvas),
+            )
         url = f"{self.base_url}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",

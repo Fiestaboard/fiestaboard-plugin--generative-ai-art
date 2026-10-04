@@ -12,21 +12,29 @@ every board the user owns —
 - Note (15 × 3)
 - Note array / FiestaPanel, anything from 15 × 3 to 120 × 24
 
-Works with any OpenAI v1-compatible endpoint (OpenAI, OpenRouter, Ollama, …).
+How it reaches a model:
+
+- **FiestaBoard's AI providers** (the default, FiestaBoard 9.11.0+): the
+  provider picked in ``ai_provider`` (blank = FiestaBot's default) through
+  ``self.ai_complete``, so every provider and sign-in set up in Settings →
+  AI Providers works and the plugin carries no AI setup of its own.
+- **A separate API key** (``api_key`` + ``api_base_url`` + ``model``): the
+  original OpenAI-compatible path, unchanged, and always used when a key is
+  saved. It also keeps working on cores that predate ``ai_complete``.
 """
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.plugins.base import PluginBase, PluginResult
 
 try:
-    from .source import ArtGenerator, Canvas
+    from .source import REQUEST_TIMEOUT, ArtGenerator, ArtRequestError, Canvas
 except ImportError:
     # Fallback for when __init__.py is imported as a top-level module
     # (e.g., during pytest package setup before the package context is known).
-    from source import ArtGenerator, Canvas  # type: ignore[no-redef]
+    from source import REQUEST_TIMEOUT, ArtGenerator, ArtRequestError, Canvas  # type: ignore[no-redef]
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +43,26 @@ logger = logging.getLogger(__name__)
 #: 120-column frame on it. Bounded so a long-lived process cannot grow a
 #: cache entry per geometry it has ever seen.
 MAX_REMEMBERED_PIECES = 16
+
+DEFAULT_BASE_URL = "https://api.openai.com/v1"
+DEFAULT_MODEL = "gpt-4o-mini"
+
+NEEDS_NEWER_CORE = (
+    "Update FiestaBoard to use its AI providers, or paste an API key in this plugin's settings."
+)
+NOT_CONFIGURED = (
+    "Set up AI in Settings → AI Providers, or paste an API key in this plugin's settings. ({})"
+)
+REJECTED = "Reconnect the AI provider in Settings → AI Providers. ({})"
+
+
+def _ai_error_classes() -> Tuple[type, ...]:
+    """``(AINotConfiguredError, AIRejectedError)``, or empty on a core before 9.11.0."""
+    try:
+        from src.plugins.base import AINotConfiguredError, AIRejectedError
+    except ImportError:
+        return ()
+    return AINotConfiguredError, AIRejectedError
 
 
 class GenerativeAiArtPlugin(PluginBase):
@@ -53,6 +81,11 @@ class GenerativeAiArtPlugin(PluginBase):
         # The generator holds no geometry — the canvas is passed per call —
         # so a single instance is safe to share across every board.
         self._generator: Optional[ArtGenerator] = None
+        self._generator_key: Optional[Tuple[str, ...]] = None
+        # What the last provider call left behind: the error it raised and
+        # the model that answered.
+        self._ai_failure: Optional[BaseException] = None
+        self._ai_model_used: str = ""
         # Fallback pieces keyed by canvas geometry. Keying matters: without
         # it an outage on one board serves another board's frame, which is
         # either an overflow or a mostly-blank panel.
@@ -76,8 +109,8 @@ class GenerativeAiArtPlugin(PluginBase):
         """
         errors: List[str] = []
 
-        if not config.get("api_key"):
-            errors.append("API key is required")
+        # No API key is not an error: FiestaBoard's AI providers are used
+        # instead, and fetch_data reports when none is set up.
 
         base_url = config.get("api_base_url", "")
         if base_url and not (
@@ -109,16 +142,30 @@ class GenerativeAiArtPlugin(PluginBase):
         cfg = self.config
         canvas = self.canvas()
 
-        if not cfg.get("api_key"):
-            return PluginResult(available=False, error="API key not configured")
-
-        generator = self._get_generator()
-        if generator is None:
-            return PluginResult(
-                available=False, error="Art generator could not be initialised"
+        api_key = cfg.get("api_key", "")
+        if api_key:
+            # The original path, byte for byte: a saved key always wins.
+            model = cfg.get("model", DEFAULT_MODEL)
+            generator = self._get_generator(
+                ("key", cfg.get("api_base_url", DEFAULT_BASE_URL), api_key, model)
             )
+        else:
+            if not callable(getattr(self, "ai_complete", None)):  # core before 9.11.0
+                return PluginResult(available=False, error=NEEDS_NEWER_CORE)
+            generator = self._get_generator(("ai",))
 
+        self._ai_failure = None
         piece = generator.generate(canvas)
+
+        if piece is None and self._ai_failure is not None:
+            failure = self._ai_failure
+            not_configured = _ai_error_classes()
+            if not_configured and isinstance(failure, not_configured[0]):
+                return PluginResult(available=False, error=NOT_CONFIGURED.format(failure))
+            if not_configured and isinstance(failure, not_configured[1]):
+                return PluginResult(available=False, error=REJECTED.format(failure))
+            logger.warning("AI provider call failed for %s: %s", canvas.key, failure)
+            return self._fallback_result(canvas, f"Art generation failed: {failure}")
 
         if piece is None:
             logger.warning(
@@ -133,7 +180,7 @@ class GenerativeAiArtPlugin(PluginBase):
             "description": piece["description"],
             "art": piece["art"],
             "lines": piece["lines"],
-            "model": cfg.get("model", "unknown"),
+            "model": self._ai_model_used if not api_key else cfg.get("model", "unknown"),
             "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
         }
         self._remember(canvas, record)
@@ -180,26 +227,53 @@ class GenerativeAiArtPlugin(PluginBase):
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _get_generator(self) -> Optional[ArtGenerator]:
-        """Return (or lazily create) the ArtGenerator for the current config."""
-        if self._generator is not None:
+    def _ai_reply(self, messages: List[Dict[str, str]], *, temperature: float, max_tokens: int) -> str:
+        """Ask FiestaBoard's AI providers; the bridge handed to ArtGenerator.
+
+        ``self.ai_complete`` is looked up on every call, never captured.  Any
+        failure is kept for ``fetch_data`` to explain and re-raised as an
+        :class:`ArtRequestError`, which the generator does not retry.
+        """
+        cfg = self.config
+        try:
+            result = self.ai_complete(
+                messages,
+                provider_id=cfg.get("ai_provider") or None,
+                model=cfg.get("ai_model") or None,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=float(REQUEST_TIMEOUT),
+            )
+        except Exception as exc:  # noqa: BLE001 — fetch_data must never raise
+            self._ai_failure = exc
+            raise ArtRequestError(str(exc)) from exc
+        self._ai_model_used = str(getattr(result, "model", "") or "")
+        return str(getattr(result, "text", result))
+
+    def _get_generator(self, key: Tuple[str, ...]) -> ArtGenerator:
+        """Return the ArtGenerator for *key*, rebuilt when it changes.
+
+        *key* is ``("key", base_url, api_key, model)`` for a saved API key, or
+        ``("ai",)`` for FiestaBoard's AI providers.
+        """
+        if self._generator is not None and self._generator_key == key:
             return self._generator
 
         cfg = self.config
-        api_key = cfg.get("api_key", "")
-        if not api_key:
-            return None
-
         themes = cfg.get("themes") or []
+        if key[0] == "key":
+            _, base_url, api_key, model = key
+            connection: Dict[str, Any] = {"base_url": base_url, "api_key": api_key, "model": model}
+        else:
+            connection = {"base_url": "", "api_key": "", "model": "", "complete": self._ai_reply}
+        self._generator_key = key
         self._generator = ArtGenerator(
-            base_url=cfg.get("api_base_url", "https://api.openai.com/v1"),
-            api_key=api_key,
-            model=cfg.get("model", "gpt-4o-mini"),
             temperature=float(cfg.get("temperature", 1.2)),
             themes=themes if isinstance(themes, list) else [],
             extra_instructions=cfg.get("extra_instructions", ""),
             custom_system_prompt=cfg.get("custom_system_prompt", ""),
             show_title=bool(cfg.get("show_title", False)),
+            **connection,
         )
 
         return self._generator
