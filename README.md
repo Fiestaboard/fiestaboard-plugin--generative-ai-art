@@ -11,7 +11,8 @@ Each refresh the plugin asks the model to compose a unique colour-tile compositi
 - Renders on **every board FiestaBoard supports**, with nothing to configure:
   - **Flagship** — 22 × 6
   - **Note** — 15 × 3
-  - **Note array / FiestaPanel** — anything from 15 × 3 to 120 × 24
+  - **Note array** — anything from 15 × 3 to 120 × 24
+  - **FiestaPanel** — any grid from 15 × 3 up to 128 × 96
 - Graceful fallback: if the LLM call fails, the board keeps showing the last successful piece
   **for that board** — a Note is never handed a Flagship's frame
 - Configurable refresh interval, temperature, and custom theme list

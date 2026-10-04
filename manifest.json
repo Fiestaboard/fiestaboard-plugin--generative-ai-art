@@ -2,7 +2,7 @@
   "id": "generative_ai_art",
   "name": "Generative AI Art",
   "version": "1.5.0",
-  "description": "Generate full-screen abstract art for your split-flap display using your FiestaBoard AI provider. Each piece is a unique, thought-out composition using the board's 8-color palette, composed for whatever board it lands on — Flagship, Note, or a note array up to 120x24.",
+  "description": "Generate full-screen abstract art for your split-flap display using your FiestaBoard AI provider. Each piece is a unique, thought-out composition using the board's 8-color palette, composed for whatever board it lands on — Flagship, Note, a note array up to 120x24, or a FiestaPanel up to 128x96.",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--generative-ai-art",
   "documentation": "README.md",
@@ -156,7 +156,7 @@
       "art": {
         "description": "Full-board color art pattern, sized to the board being rendered (one tile per cell, rows separated by newlines)",
         "type": "string",
-        "max_length": 2903,
+        "max_length": 12383,
         "group": "display",
         "example": "{blue}{violet}{blue}..."
       },

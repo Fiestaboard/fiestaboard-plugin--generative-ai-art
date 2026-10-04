@@ -16,8 +16,8 @@ Each refresh, the plugin asks the model to compose a full-screen abstract art pi
 - Generates unique full-screen colour art on every refresh
 - Uses your FiestaBoard AI provider: any protocol (OpenAI-compatible, Anthropic, OpenAI Responses) and any connection (pasted key, or a sign-in with OpenRouter, Hugging Face or ChatGPT)
 - Optionally uses a separate API key for any OpenAI v1-compatible endpoint instead
-- Fills **any** board: Flagship (22 × 6), Note (15 × 3), or a note array /
-  FiestaPanel anywhere from 15 × 3 up to 120 × 24 — nothing to configure
+- Fills **any** board: Flagship (22 × 6), Note (15 × 3), a note array up to
+  120 × 24, or a FiestaPanel up to 128 × 96 — nothing to configure
 - Falls back gracefully — if the LLM is unavailable the last piece *for that
   board* stays on screen
 - 63 built-in artistic themes, or supply your own

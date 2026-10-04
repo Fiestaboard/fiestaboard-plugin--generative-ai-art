@@ -1,9 +1,10 @@
 """Art generation logic for the Generative AI Art FiestaBoard plugin.
 
 The plugin renders onto whatever board it is bound to: a Flagship (22x6), a
-Note (15x3), or a note array anywhere from 15x3 to 120x24 (which is what a
-FiestaPanel is). Nothing here owns a list of board sizes; every dimension
-arrives as a :class:`Canvas` built from ``self.board`` by the plugin.
+Note (15x3), a note array anywhere from 15x3 to 120x24, or a FiestaPanel
+of any per-character grid up to 128x96. Nothing here owns a list of board
+sizes; every dimension arrives as a :class:`Canvas` built from
+``self.board`` by the plugin.
 
 Two emission strategies, chosen from the cell count alone:
 
