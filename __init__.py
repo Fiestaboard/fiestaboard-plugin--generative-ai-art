@@ -235,6 +235,10 @@ class GenerativeAiArtPlugin(PluginBase):
         :class:`ArtRequestError`, which the generator does not retry.
         """
         cfg = self.config
+        if self._provider_protocol(cfg.get("ai_provider") or None) == "anthropic":
+            # Anthropic refuses anything above 1.0, and this plugin defaults
+            # to 1.2. Newer cores cap it themselves; 9.11 to 9.13 pass it on.
+            temperature = min(temperature, 1.0)
         try:
             result = self.ai_complete(
                 messages,
@@ -249,6 +253,18 @@ class GenerativeAiArtPlugin(PluginBase):
             raise ArtRequestError(str(exc)) from exc
         self._ai_model_used = str(getattr(result, "model", "") or "")
         return str(getattr(result, "text", result))
+
+    def _provider_protocol(self, provider_id: Optional[str]) -> Optional[str]:
+        """The protocol of *provider_id* (``None`` = FiestaBot's default), if known."""
+        try:
+            listed = self.ai_providers() or []
+        except Exception:  # noqa: BLE001 — unreadable settings: let ai_complete say why
+            return None
+        for provider in listed:
+            chosen = provider.get("id") == provider_id if provider_id else provider.get("default")
+            if chosen:
+                return provider.get("protocol")
+        return None
 
     def _get_generator(self, key: Tuple[str, ...]) -> ArtGenerator:
         """Return the ArtGenerator for *key*, rebuilt when it changes.
