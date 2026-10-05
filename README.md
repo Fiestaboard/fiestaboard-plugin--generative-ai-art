@@ -55,7 +55,7 @@ Set up a provider once in **Settings → AI Providers**, then enable the plugin.
 | `api_key` | string | — | **Use a separate API key (optional).** When set it always wins, and the plugin calls `api_base_url` with `model` directly instead of your AI providers. Use any value (e.g. `"ollama"`) for local endpoints that don't need auth. |
 | `api_base_url` | string | `https://api.openai.com/v1` | With a separate API key: base URL for the chat completions endpoint. |
 | `model` | string | `gpt-4o-mini` | With a separate API key: model name. |
-| `temperature` | number 0–2 | `1.2` | Sampling temperature. 1.0–1.4 works well for art. |
+| `temperature` | number 0–2 | `1.2` | Sampling temperature. 1.0–1.4 works well for art; Anthropic providers get at most 1.0. |
 | `refresh_seconds` | integer ≥300 | `1800` | How often to generate a new piece (minimum 5 minutes). |
 | `themes` | string[] | `[]` | Custom theme list. Leave empty to use the 63 built-in themes. |
 | `extra_instructions` | string | `""` | Extra instructions appended to the built-in system prompt (e.g. `"favour cool colours"`). Ignored when `custom_system_prompt` is set. |

@@ -108,7 +108,7 @@ services:
 | `api_key` | — | Optional separate API key. When set it always wins over the AI provider. |
 | `api_base_url` | `https://api.openai.com/v1` | With a separate API key: base URL for the chat completions endpoint. |
 | `model` | `gpt-4o-mini` | With a separate API key: model to use. |
-| `temperature` | `1.2` | Sampling temperature (0–2). 1.0–1.4 gives varied, artistic results. |
+| `temperature` | `1.2` | Sampling temperature (0–2). 1.0–1.4 gives varied, artistic results. Anthropic providers accept at most 1.0, so higher values are sent as 1.0. |
 | `refresh_seconds` | `1800` | How often to generate a new piece (minimum 300 s / 5 min). |
 | `themes` | `[]` | Custom theme list. Empty = use the 63 built-in themes. |
 | `extra_instructions` | `""` | Additional instructions appended to the prompt (e.g. `"favour cool colours"`). |

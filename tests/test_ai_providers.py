@@ -359,3 +359,44 @@ def test_core_saved_key_never_touches_the_providers():
     assert result.available is True
     complete.assert_not_called()
     assert post.call_args.args[0] == "https://api.openai.com/v1/chat/completions"
+
+
+# ── Anthropic accepts temperature 0-1 (cores before FiestaBoard caps it) ───
+
+
+def _providers(*protocols):
+    return lambda: [
+        {"id": f"p{i}", "protocol": proto, "default": i == 0} for i, proto in enumerate(protocols)
+    ]
+
+
+def test_anthropic_provider_gets_temperature_capped_at_one():
+    complete = MagicMock(return_value=_completion())
+    plugin = _plugin({"ai_provider": "p1", "temperature": 1.2}, complete)
+    plugin.ai_providers = _providers("openai", "anthropic")
+    plugin.fetch_data()
+    assert complete.call_args.kwargs["temperature"] == 1.0
+
+
+def test_default_anthropic_provider_gets_temperature_capped_at_one():
+    complete = MagicMock(return_value=_completion())
+    plugin = _plugin({"temperature": 1.4}, complete)
+    plugin.ai_providers = _providers("anthropic", "openai")
+    plugin.fetch_data()
+    assert complete.call_args.kwargs["temperature"] == 1.0
+
+
+def test_other_protocols_keep_the_configured_temperature():
+    complete = MagicMock(return_value=_completion())
+    plugin = _plugin({"ai_provider": "p1", "temperature": 1.2}, complete)
+    plugin.ai_providers = _providers("anthropic", "openai")
+    plugin.fetch_data()
+    assert complete.call_args.kwargs["temperature"] == 1.2
+
+
+def test_unreadable_providers_keep_the_configured_temperature():
+    complete = MagicMock(return_value=_completion())
+    plugin = _plugin({"temperature": 1.2}, complete)
+    plugin.ai_providers = MagicMock(side_effect=RuntimeError("test unreadable"))
+    plugin.fetch_data()
+    assert complete.call_args.kwargs["temperature"] == 1.2
