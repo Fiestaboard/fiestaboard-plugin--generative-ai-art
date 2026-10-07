@@ -83,7 +83,21 @@ def test_manifest_passes_core_validation():
         validate_settings_schema_ui,
     )
 
-    assert validate_manifest(MANIFEST)[0] is True
+    try:
+        from src.plugins.manifest import VARIABLE_FORMATS
+    except ImportError:  # core 9.13 and earlier: variable formats are not checked
+        VARIABLE_FORMATS = None
+
+    valid, errors = validate_manifest(MANIFEST)
+    if VARIABLE_FORMATS is None or "canvas" in VARIABLE_FORMATS:
+        assert valid is True, errors
+    else:
+        # A core without pixel canvases (before FiestaBoard PR #2228's
+        # follow-up, feat/canvas-pages) knows only text/markup formats and
+        # refuses the `canvas` variable. That must be the ONLY complaint.
+        assert errors == [
+            "variables.simple.canvas.format must be one of text, markup, got 'canvas'"
+        ]
     assert validate_settings_schema_ui(MANIFEST["settings_schema"]) == []
     assert settings_schema_ui_warnings(MANIFEST["settings_schema"]) == []
 
