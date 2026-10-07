@@ -1,8 +1,8 @@
 {
   "id": "generative_ai_art",
   "name": "Generative AI Art",
-  "version": "1.5.1",
-  "description": "Generate full-screen abstract art for your split-flap display using your FiestaBoard AI provider. Each piece is a unique, thought-out composition using the board's 8-color palette, composed for whatever board it lands on — Flagship, Note, a note array up to 120x24, or a FiestaPanel up to 128x96.",
+  "version": "1.6.0",
+  "description": "Generate full-screen abstract art for your board using your FiestaBoard AI provider. Each piece is a unique, thought-out composition using the board's 8-color palette, composed for whatever board it lands on — Flagship, Note, a note array up to 120x24, or a FiestaPanel up to 128x96. On LED pixel displays such as a Divoom Pixoo 64 it also paints full-colour pixel art into a page canvas.",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--generative-ai-art",
   "documentation": "README.md",
@@ -160,6 +160,13 @@
         "group": "display",
         "example": "{blue}{violet}{blue}..."
       },
+      "canvas": {
+        "description": "Full-colour pixel art as a canvas content object, for a page canvas's source on an LED pixel display (sized to the display, 64x64 when unknown). On other boards it is the tile art, one pixel per tile.",
+        "type": "object",
+        "format": "canvas",
+        "group": "display",
+        "example": "{\"size\":[64,64],\"background\":\"#140c2a\",\"shapes\":[{\"type\":\"gradient\",\"from\":\"#2b1055\",\"to\":\"#ff7e5f\",\"angle\":90},{\"type\":\"circle\",\"cx\":44,\"cy\":30,\"r\":8,\"fill\":\"#ffd36e\"},{\"type\":\"polygon\",\"points\":[[0,64],[0,44],[32,36],[64,46],[64,64]],\"fill\":\"#3a1f2b\"}]}"
+      },
       "theme": {
         "description": "Theme or concept of the current art piece",
         "type": "string",
@@ -274,6 +281,22 @@
           "alignment": "left",
           "wrap": false
         }
+      ],
+      "canvases": [
+        {
+          "id": "art",
+          "area": {
+            "row": 1,
+            "col": 1,
+            "rows": 96,
+            "cols": 128
+          },
+          "bleed": [
+            "all"
+          ],
+          "text": "hide",
+          "source": "{{generative_ai_art.canvas}}"
+        }
       ]
     },
     "note": {
@@ -295,6 +318,22 @@
         {
           "alignment": "left",
           "wrap": false
+        }
+      ],
+      "canvases": [
+        {
+          "id": "art",
+          "area": {
+            "row": 1,
+            "col": 1,
+            "rows": 96,
+            "cols": 128
+          },
+          "bleed": [
+            "all"
+          ],
+          "text": "hide",
+          "source": "{{generative_ai_art.canvas}}"
         }
       ]
     }

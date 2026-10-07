@@ -1,8 +1,12 @@
 """Generative AI Art plugin for FiestaBoard.
 
-Generates full-screen abstract art for your split-flap display by calling
-an OpenAI-compatible chat completions endpoint.  Each piece is a unique
-colour-tile composition using the board's 8-colour palette.
+Generates full-screen abstract art for your board by calling an AI model.
+On a split-flap board each piece is a colour-tile composition in the board's
+8-colour palette (``art``). On an LED pixel-matrix display (a Divoom Pixoo 64,
+say) the plugin draws full-colour pixel art instead and publishes it as the
+``canvas`` variable -- a pixel-canvas content object a page canvas can show --
+with ``art`` derived from the same picture. ``canvas`` is a valid content
+object on every board (built from the tiles on split-flap boards).
 
 The board is never configured: the platform binds ``self.board`` for the
 render and every dimension is derived from it, so one configuration serves
@@ -30,11 +34,33 @@ from typing import Any, Dict, List, Optional, Tuple
 from src.plugins.base import PluginBase, PluginResult
 
 try:
-    from .source import REQUEST_TIMEOUT, ArtGenerator, ArtRequestError, Canvas
+    from .pixel_canvas import (
+        FALLBACK_DESCRIPTION,
+        FALLBACK_THEME,
+        PixelTarget,
+        canvas_key,
+        fallback_content,
+        generate_pixel_piece,
+        pixel_target,
+        sample_grid,
+        tiles_content,
+    )
+    from .source import REQUEST_TIMEOUT, ArtGenerator, ArtRequestError, Canvas, medium_for
 except ImportError:
     # Fallback for when __init__.py is imported as a top-level module
     # (e.g., during pytest package setup before the package context is known).
-    from source import REQUEST_TIMEOUT, ArtGenerator, ArtRequestError, Canvas  # type: ignore[no-redef]
+    from pixel_canvas import (  # type: ignore[no-redef]
+        FALLBACK_DESCRIPTION,
+        FALLBACK_THEME,
+        PixelTarget,
+        canvas_key,
+        fallback_content,
+        generate_pixel_piece,
+        pixel_target,
+        sample_grid,
+        tiles_content,
+    )
+    from source import REQUEST_TIMEOUT, ArtGenerator, ArtRequestError, Canvas, medium_for  # type: ignore[no-redef]
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +116,9 @@ class GenerativeAiArtPlugin(PluginBase):
         # it an outage on one board serves another board's frame, which is
         # either an overflow or a mostly-blank panel.
         self._last_pieces: Dict[str, Dict[str, Any]] = {}
+        # Full-colour pieces for pixel displays, keyed by board/display key
+        # plus the drawing size (see pixel_canvas.canvas_key).
+        self._last_canvases: Dict[str, Dict[str, Any]] = {}
 
     # ------------------------------------------------------------------
     # PluginBase interface
@@ -131,6 +160,7 @@ class GenerativeAiArtPlugin(PluginBase):
         """Reset generator and remembered pieces when settings change."""
         self._generator = None
         self._last_pieces.clear()
+        self._last_canvases.clear()
         logger.debug("GenerativeAiArtPlugin config updated, generator reset")
 
     def fetch_data(self) -> PluginResult:
@@ -155,15 +185,19 @@ class GenerativeAiArtPlugin(PluginBase):
             generator = self._get_generator(("ai",))
 
         self._ai_failure = None
+        model_used = cfg.get("model", "unknown") if api_key else None
+
+        target = pixel_target(self.board)
+        if target is not None:
+            return self._fetch_pixel_art(generator, canvas, target, model_used)
+
         piece = generator.generate(canvas)
 
         if piece is None and self._ai_failure is not None:
+            refused = self._refusal()
+            if refused is not None:
+                return refused
             failure = self._ai_failure
-            not_configured = _ai_error_classes()
-            if not_configured and isinstance(failure, not_configured[0]):
-                return PluginResult(available=False, error=NOT_CONFIGURED.format(failure))
-            if not_configured and isinstance(failure, not_configured[1]):
-                return PluginResult(available=False, error=REJECTED.format(failure))
             logger.warning("AI provider call failed for %s: %s", canvas.key, failure)
             return self._fallback_result(canvas, f"Art generation failed: {failure}")
 
@@ -180,8 +214,9 @@ class GenerativeAiArtPlugin(PluginBase):
             "description": piece["description"],
             "art": piece["art"],
             "lines": piece["lines"],
-            "model": self._ai_model_used if not api_key else cfg.get("model", "unknown"),
-            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+            "canvas": tiles_content(piece["grid"]),
+            "model": self._ai_model_used if model_used is None else model_used,
+            "generated_at": _now(),
         }
         self._remember(canvas, record)
 
@@ -221,7 +256,84 @@ class GenerativeAiArtPlugin(PluginBase):
         board = self.board
         if board is None:
             return Canvas.default(show_title=show_title)
-        return Canvas(rows=board.rows, cols=board.cols, show_title=show_title)
+        medium = medium_for(getattr(board, "display", None))
+        return Canvas(rows=board.rows, cols=board.cols, show_title=show_title, medium=medium)
+
+    # ------------------------------------------------------------------
+    # Pixel displays
+    # ------------------------------------------------------------------
+
+    def _fetch_pixel_art(
+        self, generator: ArtGenerator, canvas: Canvas, target: PixelTarget, model_used: Optional[str]
+    ) -> PluginResult:
+        """One full-colour piece for a pixel display: ``canvas`` plus derived ``art``.
+
+        On failure: the last good piece for this display and size, else a
+        fixed fallback scene -- never an empty or invalid canvas. A provider
+        that is not set up (or refused) is reported exactly as for tile art.
+        """
+        key = canvas_key(self.board, canvas, target)
+        piece = generate_pixel_piece(generator, canvas, target)
+
+        if piece is None:
+            refused = self._refusal()
+            if refused is not None:
+                return refused
+            if self._ai_failure is not None:
+                error = f"Art generation failed: {self._ai_failure}"
+            else:
+                error = "Art generation failed; showing a fallback piece"
+            logger.warning("Pixel art generation failed for %s: %s", key, error)
+            return self._pixel_fallback(generator, canvas, target, key, error)
+
+        record: Dict[str, Any] = {
+            "theme": piece["theme"],
+            "description": piece["description"],
+            "art": piece["art"],
+            "lines": piece["lines"],
+            "canvas": piece["canvas"],
+            "model": self._ai_model_used if model_used is None else model_used,
+            "generated_at": _now(),
+        }
+        self._last_canvases[key] = record
+        while len(self._last_canvases) > MAX_REMEMBERED_PIECES:
+            self._last_canvases.pop(next(iter(self._last_canvases)))
+        return PluginResult(available=True, data=self._record_to_data(record), formatted_lines=list(record["lines"]))
+
+    def _pixel_fallback(
+        self, generator: ArtGenerator, canvas: Canvas, target: PixelTarget, key: str, error: str
+    ) -> PluginResult:
+        record = self._last_canvases.get(key)
+        if record is None:
+            content = fallback_content(target)
+            grid = sample_grid(content, canvas.art_rows, canvas.cols)
+            lines = generator.render_lines(grid, FALLBACK_THEME, canvas)
+            record = {
+                "theme": FALLBACK_THEME,
+                "description": FALLBACK_DESCRIPTION,
+                "art": "\n".join(lines),
+                "lines": lines,
+                "canvas": content,
+                "model": "",
+                "generated_at": "",
+            }
+        else:
+            logger.info("Returning last-known pixel art for %s as fallback", key)
+        data = self._record_to_data(record)
+        data["_fallback"] = True
+        return PluginResult(available=True, data=data, error=error, formatted_lines=list(record["lines"]))
+
+    def _refusal(self) -> Optional[PluginResult]:
+        """The not-set-up / rejected result for the last provider failure, if it was one."""
+        failure = self._ai_failure
+        not_configured = _ai_error_classes()
+        if failure is None or not not_configured:
+            return None
+        if isinstance(failure, not_configured[0]):
+            return PluginResult(available=False, error=NOT_CONFIGURED.format(failure))
+        if isinstance(failure, not_configured[1]):
+            return PluginResult(available=False, error=REJECTED.format(failure))
+        return None
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -328,7 +440,12 @@ class GenerativeAiArtPlugin(PluginBase):
             "description": record.get("description", ""),
             "model": record.get("model", ""),
             "generated_at": record.get("generated_at", ""),
+            "canvas": record.get("canvas"),
         }
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
 
 # Export the plugin class

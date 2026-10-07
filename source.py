@@ -37,7 +37,7 @@ import json
 import logging
 import math
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import requests
@@ -190,6 +190,30 @@ BUILTIN_THEMES = [
 ]
 
 
+#: How the prompts name the board, by :attr:`Canvas.medium`. Only a
+#: split-flap board is "physical split-flap"; an LED or screen board told it
+#: is one gets art composed for the wrong thing.
+MEDIUM_PHRASES: Dict[str, str] = {
+    "split_flap": "a physical split-flap display",
+    "led": "an LED matrix display whose tiles are blocks of LEDs",
+    "screen": "a board display drawn on a screen",
+}
+
+
+def medium_for(display: Any) -> str:
+    """The :data:`MEDIUM_PHRASES` key for a core ``DisplayProfile`` (or ``None``)."""
+    technology = getattr(display, "technology", None) if display is not None else None
+    if technology == "led_matrix":
+        return "led"
+    if technology == "screen":
+        return "screen"
+    return "split_flap"
+
+
+def _medium_phrase(canvas: "Canvas") -> str:
+    return MEDIUM_PHRASES.get(canvas.medium, MEDIUM_PHRASES["split_flap"])
+
+
 class ArtValidationError(Exception):
     """Raised when the LLM response cannot be turned into a valid art grid."""
 
@@ -220,6 +244,10 @@ class Canvas:
     rows: int
     cols: int
     show_title: bool = False
+    #: What the board physically is, for the prompt's wording only (see
+    #: :data:`MEDIUM_PHRASES`). Not part of equality or :attr:`key`: two
+    #: boards of one size get interchangeable tile art.
+    medium: str = field(default="split_flap", compare=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "rows", max(1, int(self.rows)))
@@ -883,7 +911,7 @@ class ArtGenerator:
         """Per-cell prompt, used for boards small enough to afford one."""
         task_suffix, title_rule, title_field = self._title_clause(canvas)
         art_rows = canvas.art_rows
-        return f"""You are a generative-art composer for a physical split-flap display.
+        return f"""You are a generative-art composer for {_medium_phrase(canvas)}.
 The display uses ONLY the following 8 colors, identified by single capital letters:
 
 {self._color_table()}
@@ -931,7 +959,7 @@ OUTPUT FORMAT (strict JSON, no other text):
         """
         task_suffix, title_rule, title_field = self._title_clause(canvas)
         art_rows = canvas.art_rows
-        return f"""You are a generative-art composer for a physical split-flap display.
+        return f"""You are a generative-art composer for {_medium_phrase(canvas)}.
 The display uses ONLY the following 8 colors, identified by single capital letters:
 
 {self._color_table()}
@@ -1013,13 +1041,13 @@ OUTPUT FORMAT (strict JSON, no other text):
     # ------------------------------------------------------------------
 
     def _call_api(self, theme: str, canvas: Canvas) -> str:
-        """POST to the chat completions endpoint and return the content string."""
+        """Ask for one tile piece for *canvas* and return the reply text."""
+        return self.complete_messages(self._build_messages(theme, canvas), self.max_tokens_for(canvas))
+
+    def complete_messages(self, messages: List[Dict[str, str]], max_tokens: int) -> str:
+        """Send *messages* (the ``complete`` bridge, else HTTP) and return the reply text."""
         if self.complete is not None:
-            return self.complete(
-                self._build_messages(theme, canvas),
-                temperature=self.temperature,
-                max_tokens=self.max_tokens_for(canvas),
-            )
+            return self.complete(messages, temperature=self.temperature, max_tokens=max_tokens)
         url = f"{self.base_url}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -1027,9 +1055,9 @@ OUTPUT FORMAT (strict JSON, no other text):
         }
         payload = {
             "model": self.model,
-            "messages": self._build_messages(theme, canvas),
+            "messages": messages,
             "temperature": self.temperature,
-            "max_tokens": self.max_tokens_for(canvas),
+            "max_tokens": max_tokens,
         }
 
         response = requests.post(

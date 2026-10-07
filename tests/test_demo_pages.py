@@ -38,10 +38,15 @@ def _valid_refs(plugin_id: str, manifest: dict) -> set[str]:
 
 
 def _demo_cases() -> list[tuple[str, list[str]]]:
+    """Each demo's template lines, plus every canvas ``source`` it declares."""
     manifest = _load_manifest()
     demo = manifest.get("demo", {})
     return [
-        (device_type, entry.get("template", []))
+        (
+            device_type,
+            list(entry.get("template", []))
+            + [c.get("source", "") for c in entry.get("canvases") or []],
+        )
         for device_type, entry in demo.items()
     ]
 
