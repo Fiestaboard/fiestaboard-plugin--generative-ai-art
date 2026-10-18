@@ -727,7 +727,7 @@ def test_canvas_variable_is_declared_with_the_canvas_format():
 
 
 def test_minor_version_bump_for_the_canvas_variable():
-    assert MANIFEST["version"] == "1.6.0"
+    assert MANIFEST["version"] == "1.7.0"
 
 
 @pytest.mark.parametrize("device_type", ["flagship", "note"])

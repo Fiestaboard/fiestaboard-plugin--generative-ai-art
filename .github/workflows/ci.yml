@@ -9,6 +9,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        core-ref: [main, next]
 
     steps:
       - uses: actions/checkout@v4
@@ -17,6 +20,7 @@ jobs:
         with:
           repository: Fiestaboard/FiestaBoard
           path: fiestaboard-core
+          ref: ${{ matrix.core-ref }}
 
       - uses: actions/setup-python@v5
         with:
@@ -46,6 +50,12 @@ jobs:
           # This repo commits its own plugins/<id> symlink; only create what is missing
           [ -e "plugins/$PLUGIN_ID" ] || ln -s .. "plugins/$PLUGIN_ID"
           [ -e "$PLUGIN_ID" ] || ln -s . "$PLUGIN_ID"
+
+      - name: Require native canvas integration on next
+        if: matrix.core-ref == 'next'
+        env:
+          PYTHONPATH: "${{ github.workspace }}:fiestaboard-core"
+        run: python -c "from src.canvas.layer import render_canvases_on_grid; from src.canvas.raster import render_content"
 
       - name: Run tests
         env:
