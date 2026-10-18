@@ -26,7 +26,26 @@ The tile scene format is a background plus an ordered list of shapes (gradients,
 
 On a pixel display the model draws at the display's own pixel size (64 × 64 when the board does not report one) with up to 60 shapes: rectangles, circles, ellipses, lines, polygons, gradients and an occasional word of text, plus stripes, rings, waves and noise as shortcuts the plugin expands. The plugin clamps the result to FiestaBoard's canvas limits (at most 256 shapes and 128 × 128) and drops anything it cannot repair, so the canvas is always valid. One model call feeds both variables: the tile `art` on a pixel display is sampled from the same picture.
 
-A response that is slightly off-spec (a row short, a few unreadable cells, a reply truncated mid-array) is repaired rather than thrown away.
+A response that is slightly off-spec in the legacy tile/shape format (a row short, a few unreadable cells, a reply truncated mid-array) is repaired rather than thrown away. Authored pixel rows use stricter validation to avoid silently changing their artwork.
+
+### Precise pixel details
+
+The model can also author literal pixel rows, alone or as a compact overlay on its shapes. For example, on a 64 × 64 display this places green pixels at `(0, 0)` and `(2, 1)`, with a pink pixel at `(2, 0)`:
+
+```json
+{
+  "theme": "three lights",
+  "background": "#010203",
+  "palette": {"a": "#12ab34", "b": "#ef5678"},
+  "pixels": ["a.b", "..a"]
+}
+```
+
+Rows start at the top-left physical pixel of the content. Short rows and omitted bottom rows are transparent; use empty rows to reach a lower row. A dot (`.`) preserves the underlying background, shape or noise pixel. Authored pixels paint last, after procedural noise and mirroring; their coordinates are never mirrored. Shape `fill`/`stroke` values remain literal hex colors, not pixel palette keys.
+
+Both `palette` and `pixels` must be supplied together. Palette keys are single ASCII letters or digits (at most 62), and values are literal `#rgb` or `#rrggbb` strings. Truncated authored JSON, expressions, named colors, unknown pixel keys, non-string rows and rows beyond the display's width or height are rejected and use the existing retry/fallback behavior. Palette keys may be remapped internally when merged with noise, preserving colors; a combined palette over 62 entries is rejected rather than dropping colors. Empty/transparent-only pixel artwork still needs drawable shapes.
+
+The prompt favors shapes with optional compact pixel details, so it does not require a full bitmap or increase the existing 3,000-token response budget. A 64 × 64 source maps exactly onto a 64 × 64 panel with a full-area canvas, `bleed: ["all"]`, and `scale: 1`, as in the demo pages. Smaller canvas areas intentionally fit the art into that area.
 
 ## Template Variables
 

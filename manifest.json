@@ -1,7 +1,7 @@
 {
   "id": "generative_ai_art",
   "name": "Generative AI Art",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Generate full-screen abstract art for your board using your FiestaBoard AI provider. Each piece is a unique, thought-out composition using the board's 8-color palette, composed for whatever board it lands on — Flagship, Note, a note array up to 120x24, or a FiestaPanel up to 128x96. On LED pixel displays such as a Divoom Pixoo 64 it also paints full-colour pixel art into a page canvas.",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--generative-ai-art",

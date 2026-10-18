@@ -217,8 +217,9 @@ def canvas_system_prompt(target: PixelTarget, extra_instructions: str = "") -> s
 of exactly {w} × {h} pixels. Every pixel is one RGB LED. This is not a tile board with a \
 fixed palette: draw real pixel art.
 
-You do NOT emit pixels one by one. Describe the picture as a SCENE of shapes and the \
-display software rasterises it.
+Describe the picture primarily as a SCENE of shapes and the display software rasterises \
+it. For precise pixel details you may optionally add compact palette/pixels rows as described below; \
+do not fill the entire display with rows unless the design needs it.
 
 COORDINATES are pixels: x = 0 is the left edge and x = {w} the right edge; y = 0 is the \
 top and y = {h} the bottom (y grows downward). Numbers may have decimals.
@@ -228,8 +229,8 @@ top and y = {h} the bottom (y grows downward). Numbers may have decimals.
 RULES (non-negotiable):
 1. Output ONLY valid JSON — no markdown fences, no prose before or after.
 2. "shapes" is painted in order, back to front: later shapes cover earlier ones.
-3. Use between 6 and {MAX_PROMPT_SHAPES} shapes. Layer them: background forms first, then \
-mid-ground, then small details and highlights.
+3. For scenes use between 6 and {MAX_PROMPT_SHAPES} shapes. Layer them: background forms first, then \
+mid-ground, then small details and highlights. A design made entirely of authored pixels may omit shapes.
 4. Use "gradient" for skies, light and depth.
 5. Use "text" sparingly — only when the theme needs a word, at most one short word; the \
 letters are tiny.
@@ -254,6 +255,17 @@ SHORTCUTS (also in pixels; expanded into shapes for you):
 "frequency": 2, "phase": 0, "thickness": 3, "fill": "band|above|below"}}
 {{"type": "noise", "colors": ["#ffffff"], "density": 0.05, "x": 0, "y": 0, "w": {w}, "h": {cy}}}
    (scattered single pixels, e.g. stars or sparkle; drawn on top of everything)
+
+OPTIONAL AUTHORED PIXELS (alone or over shapes):
+- Add both "palette": {{"a": "#12ab34", "b": "#ffeedd"}} and "pixels": ["a.b", ".b"].
+- Palette keys are single ASCII letters/digits, at most 62; values are literal #rgb or #rrggbb.
+- Each row is a string starting at x=0; the first row is y=0. Use "." for transparency.
+  Short rows and omitted bottom rows are transparent. Use empty rows to reach a lower y.
+- At most {h} rows, each at most {w} characters; every non-dot must have a palette key.
+- Pixels overlay all shapes and noise, at their exact coordinates, after any mirror operation.
+  Transparent pixels preserve what is underneath. Combined noise/pixel palettes must fit 62 colours.
+- Shape fill/stroke colours remain literal hex colours, NOT palette keys. Never use template expressions.
+- Prefer small overlays for details; a full bitmap is optional and costs more response tokens.
 
 OUTPUT FORMAT (strict JSON, no other text):
 {{
@@ -776,6 +788,32 @@ def _core_check(content: Dict[str, Any]) -> None:
         raise ArtValidationError(f"Canvas content refused by core: {exc}") from exc
 
 
+def _authored_pixels(scene: Dict[str, Any], target: PixelTarget) -> Tuple[Dict[str, str], List[str]]:
+    """Validate optional literal pixel rows without cropping or evaluating model text."""
+    if "palette" not in scene and "pixels" not in scene:
+        return {}, []
+    palette, rows = scene.get("palette"), scene.get("pixels")
+    if not isinstance(palette, dict) or not isinstance(rows, list):
+        raise ArtValidationError("Authored pixels require both a palette object and a pixels array")
+    if len(palette) > MAX_PALETTE_KEYS:
+        raise ArtValidationError("Authored palette exceeds 62 colours")
+    clean: Dict[str, str] = {}
+    for key, colour in palette.items():
+        if not isinstance(key, str) or len(key) != 1 or key not in _PALETTE_KEYS:
+            raise ArtValidationError("Pixel palette keys must be one ASCII letter or digit; '.' is transparent")
+        if not isinstance(colour, str) or not (_HEX6.fullmatch(colour) or _HEX3.fullmatch(colour)):
+            raise ArtValidationError("Pixel palette colours must be literal #rgb or #rrggbb")
+        clean[key] = colour.lower()
+    if len(rows) > target.height:
+        raise ArtValidationError("Authored pixels exceed the display height")
+    for row in rows:
+        if not isinstance(row, str) or len(row) > target.width:
+            raise ArtValidationError("Pixel rows must be strings within the display width")
+        if any(key != "." and key not in clean for key in row):
+            raise ArtValidationError("Pixel row references an unknown palette key")
+    return clean, rows
+
+
 def scene_to_content(scene: Dict[str, Any], target: PixelTarget) -> Dict[str, Any]:
     """A content object for *scene* at *target*'s size, clamped to core's limits.
 
@@ -784,6 +822,7 @@ def scene_to_content(scene: Dict[str, Any], target: PixelTarget) -> Dict[str, An
     drawable is left or the picture would be a single colour.
     """
     w, h = target.size
+    authored_palette, authored_rows = _authored_pixels(scene, target)
     raw_shapes = scene.get("shapes") if isinstance(scene.get("shapes"), list) else []
     normalised = _is_normalised(raw_shapes)
     layer = _PixelLayer(w, h)
@@ -803,6 +842,18 @@ def scene_to_content(scene: Dict[str, Any], target: PixelTarget) -> Dict[str, An
     mirror = scene.get("mirror")
     shapes = _mirrored(shapes, mirror, w, h)[:MAX_CANVAS_SHAPES]
     layer.mirror(mirror)
+    # Authored coordinates are final: overlay after procedural mirroring/noise.
+    # Remap keys so a model's "a" cannot recolour the noise's "a".
+    keys: Dict[str, str] = {}
+    for key, colour in authored_palette.items():
+        mapped = layer.key_for(colour)
+        if mapped is None:
+            raise ArtValidationError("Combined noise and authored palette exceeds 62 colours")
+        keys[key] = mapped
+    for y, row in enumerate(authored_rows):
+        for x, key in enumerate(row):
+            if key != ".":
+                layer.cells[y][x] = keys[key]
     pixels = layer.rows()
 
     content: Dict[str, Any] = {
@@ -851,10 +902,17 @@ def _grid_content(raw: List[Any]) -> Dict[str, Any]:
 def parse_canvas_response(raw: Any, target: PixelTarget) -> Dict[str, Any]:
     """Parse a model reply into ``theme``, ``description``, ``title`` and ``content``."""
     cleaned = _strip_fences(raw.strip() if isinstance(raw, str) else "")
-    parsed = _loads_with_salvage(cleaned)
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError:
+        # A partial bitmap is different artwork, not a shorter scene. Keep
+        # legacy scene salvage, but never silently discard authored rows.
+        if re.search(r'"(?:palette|pixels)"\s*:', cleaned):
+            raise ArtValidationError("Authored pixels require complete JSON") from None
+        parsed = _loads_with_salvage(cleaned)
     if not isinstance(parsed, dict):
         raise ArtValidationError("Response is not a JSON object")
-    if isinstance(parsed.get("shapes"), list) and parsed["shapes"]:
+    if "palette" in parsed or "pixels" in parsed or (isinstance(parsed.get("shapes"), list) and parsed["shapes"]):
         content = scene_to_content(parsed, target)
     elif isinstance(parsed.get("grid"), list) and parsed["grid"]:
         content = _grid_content(parsed["grid"])
