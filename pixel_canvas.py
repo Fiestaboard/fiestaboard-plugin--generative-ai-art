@@ -899,6 +899,20 @@ def _grid_content(raw: List[Any]) -> Dict[str, Any]:
     return tiles_content(rows)
 
 
+def _has_authored_pixel_fields(text: str) -> bool:
+    """Inspect JSON string tokens as keys, decoding escapes only in those tokens."""
+    for token in re.finditer(r'"(?:[^"\\]|\\.)*"', text):
+        if not text[token.end():].lstrip().startswith(":"):
+            continue
+        try:
+            key = json.loads(token.group())
+        except json.JSONDecodeError:
+            continue
+        if key in ("palette", "pixels"):
+            return True
+    return False
+
+
 def parse_canvas_response(raw: Any, target: PixelTarget) -> Dict[str, Any]:
     """Parse a model reply into ``theme``, ``description``, ``title`` and ``content``."""
     cleaned = _strip_fences(raw.strip() if isinstance(raw, str) else "")
@@ -907,7 +921,7 @@ def parse_canvas_response(raw: Any, target: PixelTarget) -> Dict[str, Any]:
     except json.JSONDecodeError:
         # A partial bitmap is different artwork, not a shorter scene. Keep
         # legacy scene salvage, but never silently discard authored rows.
-        if re.search(r'"(?:palette|pixels)"\s*:', cleaned):
+        if _has_authored_pixel_fields(cleaned):
             raise ArtValidationError("Authored pixels require complete JSON") from None
         parsed = _loads_with_salvage(cleaned)
     if not isinstance(parsed, dict):

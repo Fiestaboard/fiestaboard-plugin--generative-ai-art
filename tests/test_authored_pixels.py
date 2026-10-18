@@ -133,3 +133,18 @@ def test_full_bleed_native_pixels_reach_exact_panel_positions(font, gap, padding
 def test_truncated_authored_rows_are_rejected_not_salvaged_as_partial_art(raw):
     with pytest.raises(ArtValidationError):
         parse_canvas_response(raw, PixelTarget(4, 2))
+
+
+@pytest.mark.parametrize("raw", [
+    r'{"palett\u0065":{"a":"#12ab34"},"pix\u0065ls":["a", "a',
+    r'{"shapes":[{"type":"rect","x":0,"y":0,"w":4,"h":2,"fill":"#123456"}],"pix\u0065ls":["a',
+])
+def test_truncated_authored_rows_with_escaped_keys_are_not_salvaged(raw):
+    with pytest.raises(ArtValidationError):
+        parse_canvas_response(raw, PixelTarget(4, 2))
+
+
+def test_legacy_scene_salvage_ignores_key_like_text_inside_values():
+    raw = r'{"description":"a label: \"pixels\": example", "shapes":[{"type":"rect","x":0,"y":0,"w":4,"h":2,"fill":"#123456"},'
+    content = parse_canvas_response(raw, PixelTarget(4, 2))["content"]
+    assert content["shapes"] == [{"type": "rect", "x": 0, "y": 0, "w": 4, "h": 2, "fill": "#123456"}]
