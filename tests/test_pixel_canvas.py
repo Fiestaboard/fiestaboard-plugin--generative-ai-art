@@ -15,7 +15,7 @@ import pytest
 from src.devices import BoardContext
 from src.text_to_board import count_tiles
 
-from plugins.generative_ai_art import MAX_REMEMBERED_PIECES, GenerativeAiArtPlugin
+from plugins.generative_ai_art import FALLBACK_RETRY_SECONDS, MAX_REMEMBERED_PIECES, GenerativeAiArtPlugin
 from plugins.generative_ai_art.pixel_canvas import (
     CANVAS_MAX_TOKENS,
     DEFAULT_CANVAS_SIZE,
@@ -607,6 +607,16 @@ class TestFallbackAndCache:
         assert bad.data["_fallback"] is True
         assert bad.formatted_lines == good.formatted_lines
 
+    def test_a_pixel_fallback_is_retried_soon_and_a_success_restores_the_interval(self):
+        plugin = _plugin()
+        board = pixel_board(64, 64)
+        interval = plugin.refresh_seconds
+        _fetch(plugin, board)
+        _fetch(plugin, board, payload="garbage")
+        assert plugin.refresh_seconds == FALLBACK_RETRY_SECONDS < interval
+        _fetch(plugin, board)
+        assert plugin.refresh_seconds == interval
+
     def test_failure_with_no_history_returns_the_deterministic_fallback_scene(self):
         plugin = _plugin()
         result, _ = _fetch(plugin, pixel_board(48, 32), payload="garbage")
@@ -727,7 +737,8 @@ def test_canvas_variable_is_declared_with_the_canvas_format():
 
 
 def test_minor_version_bump_for_the_canvas_variable():
-    assert MANIFEST["version"] == "1.7.0"
+    # The canvas variable shipped in 1.7.0; later patch releases keep it.
+    assert tuple(int(n) for n in MANIFEST["version"].split(".")) >= (1, 7, 0)
 
 
 @pytest.mark.parametrize("device_type", ["flagship", "note"])
