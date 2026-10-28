@@ -70,6 +70,12 @@ logger = logging.getLogger(__name__)
 #: cache entry per geometry it has ever seen.
 MAX_REMEMBERED_PIECES = 16
 
+#: How soon to try again after serving a fallback piece. The platform caches
+#: whatever ``get_data`` returns for ``refresh_seconds``; a fallback is the
+#: previous piece again, so holding it for the full interval showed the same
+#: art for another whole cycle after every failed generation.
+FALLBACK_RETRY_SECONDS = 60
+
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_MODEL = "gpt-4o-mini"
 
@@ -119,6 +125,9 @@ class GenerativeAiArtPlugin(PluginBase):
         # Full-colour pieces for pixel displays, keyed by board/display key
         # plus the drawing size (see pixel_canvas.canvas_key).
         self._last_canvases: Dict[str, Dict[str, Any]] = {}
+        # True while the last answer was a fallback piece: refresh_seconds
+        # drops to FALLBACK_RETRY_SECONDS until a generation succeeds.
+        self._serving_fallback = False
 
     # ------------------------------------------------------------------
     # PluginBase interface
@@ -127,6 +136,14 @@ class GenerativeAiArtPlugin(PluginBase):
     @property
     def plugin_id(self) -> str:
         return "generative_ai_art"
+
+    @property
+    def refresh_seconds(self) -> Optional[int]:
+        """The configured interval, or a short retry while a fallback is showing."""
+        interval = super().refresh_seconds
+        if interval is not None and getattr(self, "_serving_fallback", False):
+            return min(interval, FALLBACK_RETRY_SECONDS)
+        return interval
 
     def validate_config(self, config: Dict[str, Any]) -> List[str]:
         """Validate plugin configuration.
@@ -219,6 +236,7 @@ class GenerativeAiArtPlugin(PluginBase):
             "generated_at": _now(),
         }
         self._remember(canvas, record)
+        self._serving_fallback = False
 
         return PluginResult(
             available=True,
@@ -296,6 +314,7 @@ class GenerativeAiArtPlugin(PluginBase):
             "generated_at": _now(),
         }
         self._last_canvases[key] = record
+        self._serving_fallback = False
         while len(self._last_canvases) > MAX_REMEMBERED_PIECES:
             self._last_canvases.pop(next(iter(self._last_canvases)))
         return PluginResult(available=True, data=self._record_to_data(record), formatted_lines=list(record["lines"]))
@@ -321,6 +340,7 @@ class GenerativeAiArtPlugin(PluginBase):
             logger.info("Returning last-known pixel art for %s as fallback", key)
         data = self._record_to_data(record)
         data["_fallback"] = True
+        self._serving_fallback = True
         return PluginResult(available=True, data=data, error=error, formatted_lines=list(record["lines"]))
 
     def _refusal(self) -> Optional[PluginResult]:
@@ -423,6 +443,7 @@ class GenerativeAiArtPlugin(PluginBase):
             logger.info("Returning last-known art piece for %s as fallback", canvas.key)
             data = self._record_to_data(record)
             data["_fallback"] = True
+            self._serving_fallback = True
             return PluginResult(
                 available=True,
                 data=data,

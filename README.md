@@ -179,7 +179,7 @@ These set the separate API key path.
   - **FiestaPanel** — any grid from 15 × 3 up to 128 × 96
   - **LED pixel displays** — full-colour pixel art at the display's pixel size, through the `canvas` variable
 - Prompts name the real display: split-flap, LED matrix or screen
-- Graceful fallback: if the model call fails, the board keeps showing the last successful piece **for that board** — a Note is never handed a Flagship's frame, and a pixel display is never handed another display's canvas. A pixel display with no earlier piece shows a fixed twilight landscape rather than nothing
+- Graceful fallback: if the model call fails, the board keeps showing the last successful piece **for that board** — a Note is never handed a Flagship's frame, and a pixel display is never handed another display's canvas. A pixel display with no earlier piece shows a fixed twilight landscape rather than nothing. A fallback is shown for at most a minute before the plugin tries again, rather than for a whole refresh interval
 - Uses only the board's 8 colours on split-flap boards — at least 2 and at most 6 per piece — so compositions stay readable on physical hardware
 - Configurable refresh interval, temperature and theme list
 

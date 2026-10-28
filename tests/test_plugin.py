@@ -9,7 +9,7 @@ import pytest
 from src.devices import BoardContext
 from src.text_to_board import count_tiles
 
-from plugins.generative_ai_art import GenerativeAiArtPlugin
+from plugins.generative_ai_art import FALLBACK_RETRY_SECONDS, GenerativeAiArtPlugin
 from plugins.generative_ai_art.source import (
     BUILTIN_THEMES,
     MAX_DESCRIPTION_CHARS,
@@ -838,6 +838,37 @@ class TestPluginFetchData:
         lines = result.data["art"].split("\n")
         assert len(lines) == NOTE.rows
         assert all(count_tiles(line) == NOTE.cols for line in lines)
+
+    @patch("plugins.generative_ai_art.source.requests.post")
+    def test_a_fallback_piece_is_retried_soon_not_held_for_the_refresh_interval(
+        self, mock_post, base_config, sample_manifest
+    ):
+        """The platform caches whatever get_data returns for refresh_seconds.
+
+        A fallback is the previous piece again; caching it for the full
+        interval kept the board on the same art for another cycle after every
+        failed generation.
+        """
+        import requests as req_module
+        from datetime import timedelta
+
+        mock_post.side_effect = [
+            _response(_scene_response()),
+            req_module.RequestException("timeout"),
+            _response(_scene_response(title="NEW")),
+        ]
+        plugin = self._make_plugin(base_config, sample_manifest)
+        key = plugin._cache_key(FLAGSHIP)
+
+        plugin.get_data(FLAGSHIP)
+        plugin._last_fetch_times[key] -= timedelta(seconds=300)
+        assert plugin.get_data(FLAGSHIP).data["_fallback"] is True
+
+        plugin._last_fetch_times[key] -= timedelta(seconds=FALLBACK_RETRY_SECONDS)
+        third = plugin.get_data(FLAGSHIP)
+        assert mock_post.call_count == 3, "the fallback was held instead of retried"
+        assert "_fallback" not in third.data
+        assert plugin.refresh_seconds == 300, "a success must restore the configured interval"
 
     @patch("plugins.generative_ai_art.source.requests.post")
     def test_unavailable_when_no_history_and_failure(self, mock_post, base_config, sample_manifest):
